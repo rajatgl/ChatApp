@@ -14,7 +14,7 @@ import org.mongodb.scala.{MongoClient, MongoCollection, MongoDatabase}
 protected object DatabaseConfig {
 
   val mongoClient: MongoClient = MongoClient()
-  val databaseName: String = "UsersLogin"
+  val databaseName: String = "ChatApp"
 
   val codecProvider: CodecProvider = Macros.createCodecProvider[User]()
   val codecRegistry: CodecRegistry = CodecRegistries.fromRegistries(

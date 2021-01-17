@@ -5,6 +5,8 @@ version := "0.1"
 scalaVersion := "2.12.2"
 
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
+resolvers += Resolver.sonatypeRepo("snapshots")
+
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % "2.5.32",
   "com.typesafe.akka" %% "akka-stream" % "2.5.32",
@@ -18,5 +20,10 @@ libraryDependencies ++= Seq(
   "com.github.daddykotex" %% "courier" % "3.0.0-M2" ,
   "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2" ,
   "ch.qos.logback" % "logback-classic" % "1.2.3" % Runtime ,
-  "ch.qos.logback" % "logback-core" % "1.2.3"
+  "ch.qos.logback" % "logback-core" % "1.2.3",
+  "com.softwaremill.akka-http-session" %% "core" % "0.6.1",
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2" ,
+  "ch.qos.logback" % "logback-classic" % "1.2.3" % Runtime ,
+  "ch.qos.logback" % "logback-core" % "1.2.3",
+  "xyz.wiedenhoeft" %% "scalacrypt" % "0.5-SNAPSHOT"
 )

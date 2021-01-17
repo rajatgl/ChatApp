@@ -6,6 +6,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directive1
 import akka.http.scaladsl.server.Directives.{complete, optionalHeaderValueByName, provide}
 import authentikat.jwt.{JsonWebToken, JwtClaimsSet, JwtHeader}
+import com.bridgelabz.chat.models.User
 
 /**
  * Created on 1/8/2021.
@@ -14,9 +15,9 @@ import authentikat.jwt.{JsonWebToken, JwtClaimsSet, JwtHeader}
  */
 object TokenManager {
 
-  private val secretKey = "a$iq!@oop"
-  private val header = JwtHeader("HS256", "JWT")
-  private val tokenExpiryPeriodInDays = 1
+  val secretKey = "a$iq!@oop"
+  val header = JwtHeader("HS256", "JWT")
+   val tokenExpiryPeriodInDays = 1
 
   /**
    *
@@ -29,6 +30,16 @@ object TokenManager {
       Map(
         "email" -> email,
         "expiredAt" -> (System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(tokenExpiryPeriodInDays))
+      )
+    )
+    JsonWebToken(header, claimSet, secretKey)
+  }
+
+  def generateLoginId(user: User): String = {
+    val claimSet = JwtClaimsSet(
+      Map(
+        "user" -> (user.email + "!" + user.password),
+        "expiredAt" -> (System.currentTimeMillis() + (24*60*60*1000))
       )
     )
     JsonWebToken(header, claimSet, secretKey)
@@ -60,7 +71,7 @@ object TokenManager {
    * @param token to check if its expired
    * @return boolean result of the same
    */
-  private def isTokenExpired(token: String): Boolean =
+  def isTokenExpired(token: String): Boolean =
     getClaims(token).get("expiredAt").exists(_.toLong < System.currentTimeMillis())
 
   /**
@@ -68,7 +79,7 @@ object TokenManager {
    * @param token to be claimed
    * @return if all tokens claimed, return an empty map else return the tokens/claims remaining
    */
-  private def getClaims(token: String): Map[String, String] =
+  def getClaims(token: String): Map[String, String] =
     JsonWebToken.unapply(token) match {
       case Some(value) => value._2.asSimpleMap.getOrElse(Map.empty[String, String])
       case None => Map.empty[String, String]
