@@ -1,5 +1,7 @@
 package com.bridgelabz.chat
 
+import java.util.Date
+
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
@@ -9,7 +11,7 @@ import authentikat.jwt.JsonWebToken
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.jwt.TokenManager.{getClaims, isTokenExpired, secretKey}
-import com.bridgelabz.chat.models.{Chat, Communicate, CommunicateJsonSupport, LoginMessage, LoginMessageJsonFormat, LoginRequest, LoginRequestJsonSupport, OutputMessage, OutputMessageJsonFormat, User, UserActor, UserJsonSupport}
+import com.bridgelabz.chat.models.{Chat, Communicate, CommunicateJsonSupport, Group, GroupAddUser, GroupAddUserJsonFormat, GroupJsonFormat, GroupName, GroupNameJsonFormat, LoginMessage, LoginMessageJsonFormat, LoginRequest, LoginRequestJsonSupport, OutputMessage, OutputMessageJsonFormat, User, UserActor, UserJsonSupport}
 import com.bridgelabz.chat.users.{EncryptionManager, UserManager}
 import com.nimbusds.jose.JWSObject
 import com.typesafe.scalalogging.Logger
@@ -18,7 +20,7 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext}
 import scala.util.{Failure, Success}
 
-object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with CommunicateJsonSupport with OutputMessageJsonFormat with LoginMessageJsonFormat {
+object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with CommunicateJsonSupport with OutputMessageJsonFormat with LoginMessageJsonFormat with GroupNameJsonFormat with GroupAddUserJsonFormat with GroupJsonFormat {
 
   //server configuration variables
   val host = System.getenv("Host")
@@ -96,12 +98,12 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
             Directives.path("chat") {
               entity(Directives.as[Communicate]) { message =>
                 var jwtAuth = headerValueByName("Authorization")
-                jwtAuth{ token =>
+                jwtAuth { token =>
                   val jwtToken = token.split(" ")(1)
-                  if(isTokenExpired(jwtToken)){
+                  if (isTokenExpired(jwtToken)) {
                     complete(OutputMessage(401, "Token has expired. Please login again."))
                   }
-                  else if(!JsonWebToken.validate(jwtToken, secretKey)){
+                  else if (!JsonWebToken.validate(jwtToken, secretKey)) {
                     complete(OutputMessage(401, "Invalid token, please register with us first."))
                   }
                   else {
@@ -117,12 +119,93 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
                   }
                 }
               }
+            },
+            Directives.pathPrefix("group") {
+              Directives.concat(
+                Directives.path("create") {
+                  entity(Directives.as[GroupName]) { groupName =>
+                    headerValueByName("Authorization") { tokenFromUser =>
+
+                      val jwtToken = tokenFromUser.split(" ")
+                      jwtToken(1) match {
+                        case token if isTokenExpired(token) =>
+                          complete(401 -> "Token has expired. Please login again.")
+
+                        case token if !JsonWebToken.validate(token, secretKey) =>
+                          complete(401 -> "Token is invalid. Please login again to generate a new one.")
+
+                        case _ =>
+                          val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
+                          val uniqueId: String = (senderEmail + groupName.groupName).toUpperCase
+                          val group: Group = Group(uniqueId, groupName.groupName, senderEmail, Array[String](senderEmail))
+                          DatabaseUtils.saveGroup(group)
+                          complete(OutputMessage(250, "The group has been created successfully."))
+                      }
+                    }
+                  }
+                }
+//                ,
+//                Directives.path("addUsers") {
+//                  entity(Directives.as[GroupAddUser]) { users =>
+//                    headerValueByName("Authorization") { tokenFromUser =>
+//
+//                      val jwtToken = tokenFromUser.split(" ")
+//                      jwtToken(1) match {
+//                        case token if isTokenExpired(token) =>
+//                          complete(401 -> "Token has expired. Please login again.")
+//
+//                        case token if !JsonWebToken.validate(token, secretKey) =>
+//                          complete(401 -> "Token is invalid. Please login again to generate a new one.")
+//
+//                        case _ =>
+//                          val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
+//                          val groupId: String = (senderEmail + users.groupName).toUpperCase
+//                          DatabaseUtils.addParticipants(groupId, users.participantEmails)
+//                          val finalGroup = DatabaseUtils.getGroup(groupId)
+//                          if (finalGroup == null) {
+//                            complete(OutputMessage(404, "Group not found. Please create the group before adding participants."))
+//                          }
+//                          else {
+//                            complete(250 -> finalGroup)
+//                          }
+//                      }
+//                    }
+//                  }
+//                }
+                ,
+                Directives.path("chat") {
+                  entity(Directives.as[Communicate]) { message =>
+                    headerValueByName("Authorization") { tokenFromUser =>
+
+                      val jwtToken = tokenFromUser.split(" ")
+                      jwtToken(1) match {
+                        case token if isTokenExpired(token) =>
+                          complete(401 -> "Token has expired. Please login again.")
+
+                        case token if !JsonWebToken.validate(token, secretKey) =>
+                          complete(401 -> "Token is invalid. Please login again to generate a new one.")
+
+                        case _ =>
+                          val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
+                          val groupId: String = (senderEmail + message.receiver).toUpperCase
+                          val finalGroup = DatabaseUtils.getGroup(groupId)
+                          if (finalGroup == null) {
+                            complete(OutputMessage(404, "Group not found. Please create the group before chatting in it."))
+                          }
+                          else {
+                            DatabaseUtils.saveGroupChat(Chat(senderEmail, finalGroup.groupId, message.message))
+                            complete(OutputMessage(250, "Message has been successfully sent."))
+                          }
+                      }
+                    }
+                  }
+                }
+              )
             }
           )
         },
         get {
           concat(
-
             //path to verify JWT token for a given user
             path("verify") {
               parameters('token.as[String], 'email.as[String]) { (token, email) =>

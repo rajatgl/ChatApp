@@ -4,9 +4,9 @@ import java.util.concurrent.TimeUnit
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directive1
-import akka.http.scaladsl.server.Directives.{complete, optionalHeaderValueByName, provide}
+import akka.http.scaladsl.server.Directives.{complete, headerValueByName, optionalHeaderValueByName, provide}
 import authentikat.jwt.{JsonWebToken, JwtClaimsSet, JwtHeader}
-import com.bridgelabz.chat.models.User
+import com.bridgelabz.chat.models.{OutputMessage, OutputMessageJsonFormat, User}
 
 /**
  * Created on 1/8/2021.
@@ -49,19 +49,17 @@ object TokenManager {
    *
    * @return authentication status message
    */
-  def authenticated: Directive1[Map[String, Any]] = {
+  def authenticated(outputMessage: OutputMessage): Unit = {
 
-    optionalHeaderValueByName("Authorization").flatMap { tokenFromUser =>
+    headerValueByName("Authorization") { tokenFromUser =>
 
-      val jwtToken = tokenFromUser.get.split(" ")
+      val jwtToken = tokenFromUser.split(" ")
       jwtToken(1) match {
         case token if isTokenExpired(token) =>
-          complete(StatusCodes.Unauthorized -> "Session expired.")
+          complete(401 -> "Token has expired. Please login again.")
 
-        case token if JsonWebToken.validate(token, secretKey) =>
-          provide(getClaims(token))
-
-        case _ =>  complete(StatusCodes.Unauthorized ->"Invalid Token")
+        case token if !JsonWebToken.validate(token, secretKey) =>
+          complete(401 -> "Token is invalid. Please login again to generate a new one.")
       }
     }
   }

@@ -1,17 +1,12 @@
 package com.bridgelabz.chat.database
 
-import java.util.Date
-
 import akka.actor.Props
 import com.bridgelabz.chat.Routes
-import com.bridgelabz.chat.models.{Chat, User, UserActor}
+import com.bridgelabz.chat.models.{Chat, Group, User, UserActor}
 import com.bridgelabz.chat.users.EncryptionManager
-import com.nimbusds.jose.crypto.impl.PBKDF2
-import xyz.wiedenhoeft.scalacrypt.khash.HmacSHA256
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.Updates.set
-import org.mongodb.scala.result
-import xyz.wiedenhoeft.scalacrypt.{SymmetricKeyArbitrary, toCanBuildKeyOp}
+import org.mongodb.scala.{Completed, result}
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.DurationInt
@@ -99,10 +94,19 @@ object DatabaseUtils {
 
   /**
    *
-   * @param chat String to be saved into database
+   * @param chat instance to be saved into database
    */
   def saveChat(chat: Chat): Unit ={
     val future = DatabaseConfig.collectionForChat.insertOne(chat).toFuture()
+    Await.result(future,10.seconds)
+  }
+
+  /**
+   *
+   * @param chat instance to be saved into database
+   */
+  def saveGroupChat(chat: Chat): Unit ={
+    val future = DatabaseConfig.collectionForGroupChat.insertOne(chat).toFuture()
     Await.result(future,10.seconds)
   }
 
@@ -127,5 +131,51 @@ object DatabaseUtils {
     val dbFuture = DatabaseConfig.collection.find(equal("email",email)).toFuture()
     val user = Await.result(dbFuture, 10.seconds).head
     EncryptionManager.verify(user, password)
+  }
+
+  /**
+   *
+   * @param group instance to be saved into database
+   */
+  def saveGroup(group: Group): Unit = {
+    val groupFuture = DatabaseConfig.collectionForGroup.insertOne(group).toFuture()
+    Await.result(groupFuture, 60.seconds)
+  }
+
+//     def updateGroup(group: Group): Unit = {
+//    val groupFuture = DatabaseConfig.collectionForGroup.deleteOne(equal("groupId", group.groupId)).toFuture()
+//    val group2 = DatabaseConfig.collectionForGroup.updateOne(equal("groupId", group.groupId), group)
+//    Await.result(groupFuture, 60.seconds)
+//    saveGroup(group)
+//  }
+
+//  def addParticipants(groupId: String, users: Seq[String]): Unit = {
+//
+//    val group = getGroup(groupId)
+//    if(group != null) {
+//      val participantsArray = group.participants
+//      for (user <- users) {
+//        if (doesAccountExist(user)) {
+//          participantsArray :+ user
+//        }
+//      }
+//      val newGroup = Group(group.groupId, group.groupName, group.admin, participantsArray)
+//      updateGroup(newGroup)
+//    }
+//  }
+
+  /**
+   *
+   * @param groupId associated with required group instance
+   * @return group instance
+   */
+  def getGroup(groupId: String): Group = {
+    val groupFuture = DatabaseConfig.collectionForGroup.find(equal("groupId", groupId)).toFuture()
+    val group = Await.result(groupFuture, 60.seconds)
+
+    if(group.nonEmpty)
+      group.head
+    else
+      null
   }
 }
