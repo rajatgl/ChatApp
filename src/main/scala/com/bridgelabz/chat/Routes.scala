@@ -1,7 +1,5 @@
 package com.bridgelabz.chat
 
-import java.util.Date
-
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
@@ -42,7 +40,6 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
     case ex: Exception =>
       extractUri { uri =>
         logger.error(ex.getStackTrace.mkString("Array(", ", ", ")"))
-        println(ex.getCause.toString + ": " + ex.getMessage)
         complete(HttpResponse(408, entity = "Some error occured. Please try again later."))
       }
   }
@@ -66,12 +63,15 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
                 val userLoginStatus: Int = UserManager.userLogin(user)
 
                 if (userLoginStatus == 200) {
+                  logger.info("User Login Successful.")
                   complete(LoginMessage(TokenManager.generateLoginId(encryptedUser), 200, "Logged in successfully. Happy to serve you!"))
                 }
                 else if (userLoginStatus == 404) {
+                  logger.error("Account Not Registered.")
                   complete(OutputMessage(404, "Login failed. Your account does not seem to exist. If you did not register yet, head to: http://localhost:9000/register"))
                 }
                 else {
+                  logger.error("Account Verification Incomplete.")
                   complete(OutputMessage(400, "Login failed. Your account is not verified. Head to http://localhost:9000/verify for the same."))
                 }
               }
@@ -83,12 +83,15 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
                 val userRegisterStatus: Int = UserManager.createNewUser(user)
 
                 if (userRegisterStatus == 215) {
+                  logger.info("Verification Link Sent.")
                   complete(UserManager.sendVerificationEmail(user))
                 }
                 else if (userRegisterStatus == 414) {
+                  logger.error("Invalid Email.")
                   complete(OutputMessage(414, "Bad email, try again with a valid entry."))
                 }
                 else {
+                  logger.error("Email is already registered. Provide a new one.")
                   complete(OutputMessage(409, "User registration failed. E-mail is already registered."))
                 }
               }
@@ -101,27 +104,34 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
                 jwtAuth { token =>
                   val jwtToken = token.split(" ")(1)
                   if (isTokenExpired(jwtToken)) {
+                    logger.error("Token Expired!")
                     complete(OutputMessage(401, "Token has expired. Please login again."))
                   }
                   else if (!JsonWebToken.validate(jwtToken, secretKey)) {
+                    logger.error("Token Invalid.")
                     complete(OutputMessage(401, "Invalid token, please register with us first."))
                   }
                   else {
                     val senderEmail = getClaims(jwtToken)("user").split("!")(0)
                     if (DatabaseUtils.doesAccountExist(message.receiver)) {
-
-                      system.actorOf(Props[UserActor]).tell(Chat(senderEmail, message.receiver, message.message), ActorRef.noSender)
+                      logger.info("Message Transmitted.")
+                      system.scheduler.scheduleOnce(500 milliseconds) {
+                        system.actorOf(Props[UserActor]).tell(Chat(senderEmail, message.receiver, message.message), ActorRef.noSender)
+                      }
                       complete(OutputMessage(250, "The Message has been transmitted."))
                     }
                     else {
+                      logger.error("Receiver Email isn't Registered. ")
                       complete(OutputMessage(404, "The receiver does not seem to be registered with us."))
                     }
                   }
                 }
               }
             },
+            //all group activities happen here
             Directives.pathPrefix("group") {
               Directives.concat(
+                //endpoint to create a new group
                 Directives.path("create") {
                   entity(Directives.as[GroupName]) { groupName =>
                     headerValueByName("Authorization") { tokenFromUser =>
@@ -139,40 +149,42 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
                           val uniqueId: String = (senderEmail + groupName.groupName).toUpperCase
                           val group: Group = Group(uniqueId, groupName.groupName, senderEmail, Array[String](senderEmail))
                           DatabaseUtils.saveGroup(group)
+                          logger.info("Group Created.")
                           complete(OutputMessage(250, "The group has been created successfully."))
                       }
                     }
                   }
-                }
-//                ,
-//                Directives.path("addUsers") {
-//                  entity(Directives.as[GroupAddUser]) { users =>
-//                    headerValueByName("Authorization") { tokenFromUser =>
-//
-//                      val jwtToken = tokenFromUser.split(" ")
-//                      jwtToken(1) match {
-//                        case token if isTokenExpired(token) =>
-//                          complete(401 -> "Token has expired. Please login again.")
-//
-//                        case token if !JsonWebToken.validate(token, secretKey) =>
-//                          complete(401 -> "Token is invalid. Please login again to generate a new one.")
-//
-//                        case _ =>
-//                          val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
-//                          val groupId: String = (senderEmail + users.groupName).toUpperCase
-//                          DatabaseUtils.addParticipants(groupId, users.participantEmails)
-//                          val finalGroup = DatabaseUtils.getGroup(groupId)
-//                          if (finalGroup == null) {
-//                            complete(OutputMessage(404, "Group not found. Please create the group before adding participants."))
-//                          }
-//                          else {
-//                            complete(250 -> finalGroup)
-//                          }
-//                      }
-//                    }
-//                  }
-//                }
-                ,
+                },
+                //endpoint to add new users to a group- can add multiple users
+                Directives.path("addUsers") {
+                  entity(Directives.as[GroupAddUser]) { users =>
+                    headerValueByName("Authorization") { tokenFromUser =>
+
+                      val jwtToken = tokenFromUser.split(" ")
+                      jwtToken(1) match {
+                        case token if isTokenExpired(token) =>
+                          complete(401 -> "Token has expired. Please login again.")
+
+                        case token if !JsonWebToken.validate(token, secretKey) =>
+                          complete(401 -> "Token is invalid. Please login again to generate a new one.")
+
+                        case _ =>
+                          val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
+                          val groupId: String = (senderEmail + users.groupName).toUpperCase
+                          DatabaseUtils.addParticipants(groupId, users.participantEmails)
+                          logger.info("New Participant Added.")
+                          val finalGroup = DatabaseUtils.getGroup(groupId)
+                          if (finalGroup == null) {
+                            complete(OutputMessage(404, "Group not found. Please create the group before adding participants."))
+                          }
+                          else {
+                            complete(finalGroup)
+                          }
+                      }
+                    }
+                  }
+                },
+                //endpoint to send a message on a group
                 Directives.path("chat") {
                   entity(Directives.as[Communicate]) { message =>
                     headerValueByName("Authorization") { tokenFromUser =>
@@ -187,13 +199,15 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
 
                         case _ =>
                           val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
-                          val groupId: String = (senderEmail + message.receiver).toUpperCase
+                          val groupId: String = message.receiver.toUpperCase
                           val finalGroup = DatabaseUtils.getGroup(groupId)
-                          if (finalGroup == null) {
-                            complete(OutputMessage(404, "Group not found. Please create the group before chatting in it."))
+                          if (finalGroup == null || !finalGroup.participants.contains(senderEmail)) {
+                            logger.error("Invalid groupID.")
+                            complete(OutputMessage(404, "The group you mentioned either does not exist, or you are not a part of it."))
                           }
                           else {
                             DatabaseUtils.saveGroupChat(Chat(senderEmail, finalGroup.groupId, message.message))
+                            logger.info("Chat Saved!")
                             complete(OutputMessage(250, "Message has been successfully sent."))
                           }
                       }
@@ -213,9 +227,11 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
                 val updateUserAsVerified = DatabaseUtils.verifyEmail(email)
                 Await.result(updateUserAsVerified, 60.seconds)
                 if (jwsObject.getPayload.toJSONObject.get("email").equals(email)) {
+                  logger.info("User Verified & Registered. ")
                   complete(OutputMessage(250, "User successfully verified and registered!"))
                 }
                 else {
+                  logger.error("User Verification Failed.")
                   complete(OutputMessage(401, "User could not be verified!"))
                 }
               }

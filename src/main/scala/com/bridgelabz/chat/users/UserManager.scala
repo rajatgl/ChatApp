@@ -27,11 +27,11 @@ object UserManager {
     users.foreach(mainUser =>
       if (EncryptionManager.verify(mainUser, user.password)) {
         if(!mainUser.verificationComplete)
-          return 400
-        return 200
+          return 400 //user is not verified
+        return 200 // user is verified and login successful
       }
     )
-    404
+    404 //if user not found in the database
   }
 
   /**
@@ -59,12 +59,27 @@ object UserManager {
     mailer(Envelope.from(new InternetAddress(System.getenv("SENDER_EMAIL")))
       .to(new InternetAddress(user.email))
       .subject("Token")
-      .content(Text(s"Click on this link to verify your email address: ${longUrl}. Happy to serve you!")))
+      .content(Text(s"Click on this link to verify your email address: $longUrl. Happy to serve you!")))
       .onComplete {
         case Success(_) => return OutputMessage(220, "Verification link sent!")
         case Failure(_) => return OutputMessage(440, "Failed to verify user!")
       }
 
-    OutputMessage(440, "Failed to verify user!") //guaranteed return
+    OutputMessage(220, "Verification link sent!") //guaranteed return
+  }
+
+  def sendEmail(email: String, body: String): Unit = {
+    val mailer = Mailer("smtp.gmail.com", 587)
+      .auth(true)
+      .as(System.getenv("SENDER_EMAIL"),System.getenv("SENDER_PASSWORD"))
+      .startTls(true)()
+    mailer(Envelope.from(new InternetAddress(System.getenv("SENDER_EMAIL")))
+      .to(new InternetAddress(email))
+      .subject("You have received a message")
+      .content(Text(s"${body}\nHappy to serve you!")))
+      .onComplete {
+        case Success(_) => println("Email sent")
+        case Failure(_) => println("Email could not be sent")
+      }
   }
 }
