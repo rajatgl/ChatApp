@@ -3,13 +3,14 @@ package com.bridgelabz.chat
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
-import akka.http.scaladsl.server.Directives.{_symbol2NR, complete, concat, entity, extractUri, get, handleExceptions, headerValueByName, optionalHeaderValueByName, parameters, path, post, provide}
+import akka.http.scaladsl.model.headers.{HttpOrigin, Origin, RawHeader}
+import akka.http.scaladsl.server.Directives.{_symbol2NR, complete, concat, entity, extractUri, get, handleExceptions, headerValueByName, optionalHeaderValueByName, parameters, path, post, provide, respondWithHeaders}
 import akka.http.scaladsl.server.{Directives, ExceptionHandler, Route}
 import authentikat.jwt.JsonWebToken
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.jwt.TokenManager.{getClaims, isTokenExpired, secretKey}
-import com.bridgelabz.chat.models.{Chat, Communicate, CommunicateJsonSupport, Group, GroupAddUser, GroupAddUserJsonFormat, GroupJsonFormat, GroupName, GroupNameJsonFormat, LoginMessage, LoginMessageJsonFormat, LoginRequest, LoginRequestJsonSupport, OutputMessage, OutputMessageJsonFormat, User, UserActor, UserJsonSupport}
+import com.bridgelabz.chat.models.{Chat, Communicate, CommunicateJsonSupport, Group, GroupAddUser, GroupAddUserJsonFormat, GroupJsonFormat, GroupName, GroupNameJsonFormat, LoginMessage, LoginMessageJsonFormat, LoginRequest, LoginRequestJsonSupport, OutputMessage, OutputMessageJsonFormat, SeqChat, SeqChatJsonSupport, User, UserActor, UserJsonSupport}
 import com.bridgelabz.chat.users.{EncryptionManager, UserManager}
 import com.nimbusds.jose.JWSObject
 import com.typesafe.scalalogging.Logger
@@ -18,7 +19,7 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext}
 import scala.util.{Failure, Success}
 
-object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with CommunicateJsonSupport with OutputMessageJsonFormat with LoginMessageJsonFormat with GroupNameJsonFormat with GroupAddUserJsonFormat with GroupJsonFormat {
+object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with CommunicateJsonSupport with OutputMessageJsonFormat with LoginMessageJsonFormat with GroupNameJsonFormat with GroupAddUserJsonFormat with GroupJsonFormat with SeqChatJsonSupport {
 
   //server configuration variables
   val host = System.getenv("Host")
@@ -64,7 +65,9 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
 
                 if (userLoginStatus == 200) {
                   logger.info("User Login Successful.")
-                  complete(LoginMessage(TokenManager.generateLoginId(encryptedUser), 200, "Logged in successfully. Happy to serve you!"))
+                  respondWithHeaders(RawHeader("Token", TokenManager.generateLoginId(encryptedUser))) {
+                    complete(OutputMessage(200, "Logged in successfully. Happy to serve you!"))
+                  }
                 }
                 else if (userLoginStatus == 404) {
                   logger.error("Account Not Registered.")
@@ -233,6 +236,50 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
                 else {
                   logger.error("User Verification Failed.")
                   complete(OutputMessage(401, "User could not be verified!"))
+                }
+              }
+            },
+            path("chat"){
+              headerValueByName("Authorization") { tokenFromUser =>
+
+                val jwtToken = tokenFromUser.split(" ")
+                jwtToken(1) match {
+                  case token if isTokenExpired(token) =>
+                    complete(401 -> "Token has expired. Please login again.")
+
+                  case token if !JsonWebToken.validate(token, secretKey) =>
+                    complete(401 -> "Token is invalid. Please login again to generate a new one.")
+
+                  case _ =>
+                    val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
+                    complete(SeqChat(DatabaseUtils.getMessages(senderEmail)))
+                }
+              }
+            },
+            Directives.pathPrefix("group"){
+              path("chat"){
+                parameters('groupId.as[String]) { groupId =>
+                  headerValueByName("Authorization") { tokenFromUser =>
+
+                    val jwtToken = tokenFromUser.split(" ")
+                    jwtToken(1) match {
+                      case token if isTokenExpired(token) =>
+                        complete(401 -> "Token has expired. Please login again.")
+
+                      case token if !JsonWebToken.validate(token, secretKey) =>
+                        complete(401 -> "Token is invalid. Please login again to generate a new one.")
+
+                      case _ =>
+                        val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
+                        val group = DatabaseUtils.getGroup(groupId)
+                        if(group != null && group.participants.contains(senderEmail)) {
+                          complete(SeqChat(DatabaseUtils.getGroupMessages(groupId)))
+                        }
+                        else{
+                          complete(OutputMessage(404, "Group not found, or you are not a member of this group."))
+                        }
+                    }
+                  }
                 }
               }
             }

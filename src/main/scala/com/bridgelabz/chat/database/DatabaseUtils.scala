@@ -197,4 +197,15 @@ object DatabaseUtils {
     else
       null
   }
+
+  def getMessages(email: String): Seq[Chat] ={
+    val chatFuture = DatabaseConfig.collectionForChat.find(equal("receiver", email)).toFuture()
+    Await.result(chatFuture, 60.seconds)
+  }
+
+  def getGroupMessages(groupId: String): Seq[Chat] ={
+    val groupChatFuture = DatabaseConfig.collectionForGroupChat.find(equal("receiver", groupId)).toFuture()
+    Await.result(groupChatFuture, 60.seconds)
+  }
+
 }
