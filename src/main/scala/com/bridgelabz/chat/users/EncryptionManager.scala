@@ -1,6 +1,5 @@
 package com.bridgelabz.chat.users
 
-import com.bridgelabz.chat.Routes.logger
 import com.bridgelabz.chat.models.User
 import xyz.wiedenhoeft.scalacrypt.khash.HmacSHA256
 import xyz.wiedenhoeft.scalacrypt.{SymmetricKeyArbitrary, toCanBuildKeyOp}
@@ -29,15 +28,9 @@ object EncryptionManager {
     mac.toString
   }
 
-  def encrypt(normalString: String, secretKey: String): String = {
-
-    val key: SymmetricKeyArbitrary = secretKey.getBytes.toSeq.toKey[SymmetricKeyArbitrary].get
-    HmacSHA256(key, normalString.getBytes).get.toString
-  }
-
   /**
    *
-   * @param user the object fetched from the database- contains email and encrypted password
+   * @param user            the object fetched from the database- contains email and encrypted password
    * @param enteredPassword the string entered by the user as password while logging in
    * @return true if login was successful, false otherwise
    */
@@ -48,7 +41,7 @@ object EncryptionManager {
       val mac = HmacSHA256(passwordKey, enteredPassword.getBytes).get
       mac.toString().equals(user.password)
     }
-    catch{
+    catch {
       case ex: Throwable => false
     }
   }

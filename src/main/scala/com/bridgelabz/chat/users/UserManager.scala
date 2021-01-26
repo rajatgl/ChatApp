@@ -1,9 +1,11 @@
 package com.bridgelabz.chat.users
 
+import akka.http.javadsl.model.StatusCodes
 import com.bridgelabz.chat.Routes.executor
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.models.{OutputMessage, User}
+import com.typesafe.scalalogging.Logger
 import courier.{Envelope, Mailer, Text}
 import javax.mail.internet.InternetAddress
 
@@ -17,6 +19,8 @@ import scala.util.{Failure, Success}
  * Author: Rajat G.L.
  */
 object UserManager {
+  private val logger = Logger("UserManager")
+
   /**
    *
    * @param user instance to be logged in
@@ -26,12 +30,12 @@ object UserManager {
     val users = Await.result(DatabaseUtils.getUsers(user.email), 60.seconds)
     users.foreach(mainUser =>
       if (EncryptionManager.verify(mainUser, user.password)) {
-        if(!mainUser.verificationComplete)
-          return 400 //user is not verified
-        return 200 // user is verified and login successful
+        if (!mainUser.verificationComplete)
+          return StatusCodes.UNAUTHORIZED.intValue() //user is not verified
+        return StatusCodes.OK.intValue() // user is verified and login successful
       }
     )
-    404 //if user not found in the database
+    StatusCodes.NOT_FOUND.intValue() //if user not found in the database
   }
 
   /**
@@ -54,32 +58,37 @@ object UserManager {
 
     val mailer = Mailer("smtp.gmail.com", 587)
       .auth(true)
-      .as(System.getenv("SENDER_EMAIL"),System.getenv("SENDER_PASSWORD"))
+      .as(System.getenv("SENDER_EMAIL"), System.getenv("SENDER_PASSWORD"))
       .startTls(true)()
     mailer(Envelope.from(new InternetAddress(System.getenv("SENDER_EMAIL")))
       .to(new InternetAddress(user.email))
       .subject("Token")
       .content(Text(s"Click on this link to verify your email address: $longUrl. Happy to serve you!")))
       .onComplete {
-        case Success(_) => return OutputMessage(220, "Verification link sent!")
-        case Failure(_) => return OutputMessage(440, "Failed to verify user!")
+        case Success(_) => logger.info(s"Verification email sent to ${user.email}"); return OutputMessage(220, "Verification link sent!")
+        case Failure(exception) => logger.error(s"Failed to send verification email: ${exception.getMessage}"); return OutputMessage(440, "Failed to verify user!")
       }
 
     OutputMessage(220, "Verification link sent!") //guaranteed return
   }
 
+  /**
+   *
+   * @param email of the recipient
+   * @param body  of the email to be sent
+   */
   def sendEmail(email: String, body: String): Unit = {
     val mailer = Mailer("smtp.gmail.com", 587)
       .auth(true)
-      .as(System.getenv("SENDER_EMAIL"),System.getenv("SENDER_PASSWORD"))
+      .as(System.getenv("SENDER_EMAIL"), System.getenv("SENDER_PASSWORD"))
       .startTls(true)()
     mailer(Envelope.from(new InternetAddress(System.getenv("SENDER_EMAIL")))
       .to(new InternetAddress(email))
       .subject("You have received a message")
       .content(Text(s"${body}\nHappy to serve you!")))
       .onComplete {
-        case Success(_) => println("Email sent")
-        case Failure(_) => println("Email could not be sent")
+        case Success(_) => logger.info(s"Notification email sent to ${email}")
+        case Failure(exception) => logger.error(s"Email could not be sent: ${exception.getMessage}")
       }
   }
 }

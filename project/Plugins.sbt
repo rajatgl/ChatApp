@@ -1,0 +1,1 @@
+addSbtPlugin("com.github.sbt" % "sbt-cpd" % "2.0.0")

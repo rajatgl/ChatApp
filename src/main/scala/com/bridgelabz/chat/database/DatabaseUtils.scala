@@ -1,13 +1,16 @@
 package com.bridgelabz.chat.database
 
 import akka.actor.{ActorRef, Props}
+import akka.http.javadsl.model.StatusCodes
 import com.bridgelabz.chat.Routes
 import com.bridgelabz.chat.Routes.{executor, system}
 import com.bridgelabz.chat.models.{Chat, Group, User, UserActor}
 import com.bridgelabz.chat.users.EncryptionManager
+import com.typesafe.scalalogging.Logger
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.Updates.set
 import org.mongodb.scala.result
+
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.DurationInt
 
@@ -17,6 +20,8 @@ import scala.concurrent.duration.DurationInt
  * Author: Rajat G.L.
  */
 object DatabaseUtils {
+  private val logger = Logger("DatabaseUtils")
+
   /**
    *
    * @param user to be inserted into the database
@@ -28,28 +33,31 @@ object DatabaseUtils {
       val ifUserExists: Boolean = checkIfExists(user.email)
       if (ifUserExists) {
         //A User with the same E-Mail already exists.
-        410
+        logger.debug(s"${user.email} conflicted")
+        StatusCodes.CONFLICT.intValue()
       }
       else {
         if (Routes.system == null) {
           //Endpoints are inactive.
-          425
+          logger.debug("Endpoints inactive")
+          StatusCodes.INTERNAL_SERVER_ERROR.intValue()
         }
         else {
           val passwordEnc = EncryptionManager.encrypt(user)
           val encryptedUser: User = User(user.email, passwordEnc, user.verificationComplete)
           val future = DatabaseConfig.collection.insertOne(encryptedUser).toFuture()
           Await.result(future, 60.seconds)
+          logger.info(s"${user.email} is inserted into db")
           Routes.system.actorOf(Props[UserActor], user.email)
 
           //"Registration Successful. Please login at: http://localhost:9000/login"
-          215
+          StatusCodes.OK.intValue()
         }
       }
     }
     else {
       //"E-Mail Validation Failed"
-      414
+      StatusCodes.BAD_REQUEST.intValue()
     }
   }
 
@@ -108,11 +116,16 @@ object DatabaseUtils {
     val group: Group = getGroup(chat.receiver)
     if (system != null)
       for (user <- group.participants) {
-        if (!chat.sender.equalsIgnoreCase(user))
+        if (!chat.sender.equalsIgnoreCase(user)) {
+          logger.info(s"Notification email scheduled for: ${user}")
           system.scheduler.scheduleOnce(500 milliseconds) {
             system.actorOf(Props[UserActor]).tell(Chat(chat.sender, user, chat.message + s"\nreceived on group ${group.groupName}"), ActorRef.noSender)
           }
+        }
       }
+    else {
+      logger.error("Endpoints inactive")
+    }
 
     val future = DatabaseConfig.collectionForGroupChat.insertOne(chat).toFuture()
     Await.result(future, 10.seconds)
@@ -172,14 +185,20 @@ object DatabaseUtils {
       var participantsArray = newGroup.participants
       for (user <- users) {
         if (doesAccountExist(user) && !group.participants.contains(user)) {
+          logger.info(s"${user} added to the group: ${group.groupName}")
           participantsArray = participantsArray :+ user
         }
+        else
+          logger.debug(s"${user} not added to the group: ${group.groupName}")
       }
 
       newGroup = Group(group.groupId, group.groupName, group.admin, participantsArray)
 
       if (newGroup.participants != null && newGroup.participants.nonEmpty)
         updateGroup(newGroup)
+      else
+        logger.debug(s"Group:${newGroup.groupName} not updated.")
+
     }
   }
 
@@ -198,12 +217,22 @@ object DatabaseUtils {
       null
   }
 
-  def getMessages(email: String): Seq[Chat] ={
+  /**
+   *
+   * @param email receiver email who's messages need to be fetched
+   * @return sequence of chats received by provided user
+   */
+  def getMessages(email: String): Seq[Chat] = {
     val chatFuture = DatabaseConfig.collectionForChat.find(equal("receiver", email)).toFuture()
     Await.result(chatFuture, 60.seconds)
   }
 
-  def getGroupMessages(groupId: String): Seq[Chat] ={
+  /**
+   *
+   * @param groupId of required group
+   * @return sequence of chats received by the group
+   */
+  def getGroupMessages(groupId: String): Seq[Chat] = {
     val groupChatFuture = DatabaseConfig.collectionForGroupChat.find(equal("receiver", groupId)).toFuture()
     Await.result(groupChatFuture, 60.seconds)
   }
