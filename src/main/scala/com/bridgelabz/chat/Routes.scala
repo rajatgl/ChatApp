@@ -5,7 +5,8 @@ import akka.http.javadsl.model.StatusCodes
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.server.Directives.{_symbol2NR, complete, concat, entity, extractUri, get, handleExceptions, headerValueByName, parameters, path, post, respondWithHeaders}
+import akka.http.scaladsl.server.Directives.{_symbol2NR, complete, concat, entity, extractUri, get}
+import akka.http.scaladsl.server.Directives.{handleExceptions, headerValueByName, parameters, path, post, respondWithHeaders}
 import akka.http.scaladsl.server.{Directives, ExceptionHandler, Route}
 import authentikat.jwt.JsonWebToken
 import com.bridgelabz.chat.database.DatabaseUtils
@@ -34,15 +35,14 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
   //catching Null Pointer Exception and other default Exceptions
   val exceptionHandler = ExceptionHandler {
     case nex: NullPointerException =>
-      extractUri { uri =>
-        println(s"Request to $uri could not be handled normally")
+      extractUri { _ =>
         logger.error(nex.getStackTrace.mkString("Array(", ", ", ")"))
-        complete(HttpResponse(402, entity = "Null value found while parsing the data. Contact the admin."))
+        complete(OutputMessage(StatusCodes.BAD_REQUEST.intValue(), "Null value found while parsing the data. Contact the admin."))
       }
     case ex: Exception =>
       extractUri { _ =>
         logger.error(ex.getStackTrace.mkString("Array(", ", ", ")"))
-        complete(HttpResponse(408, entity = "Some error occured. Please try again later."))
+        complete(OutputMessage(StatusCodes.BAD_REQUEST.intValue(), "Some error occured. Please try again later."))
       }
   }
 
@@ -74,7 +74,8 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
                 }
                 else if (userLoginStatus == StatusCodes.NOT_FOUND.intValue()) {
                   logger.error("Account Not Registered.")
-                  complete(OutputMessage(userLoginStatus, "Login failed. Your account does not seem to exist. If you did not register yet, head to: http://localhost:9000/register"))
+                  complete(OutputMessage(userLoginStatus,
+                    "Login failed. Your account does not seem to exist. If you did not register yet, head to: http://localhost:9000/register"))
                 }
                 else {
                   logger.error("Account Verification Incomplete.")
@@ -184,11 +185,11 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
                           DatabaseUtils.addParticipants(groupId, users.participantEmails)
                           logger.info("New Participant Added.")
                           val finalGroup = DatabaseUtils.getGroup(groupId)
-                          if (finalGroup == null) {
+                          if (finalGroup.isEmpty) {
                             complete(OutputMessage(StatusCodes.NOT_FOUND.intValue(), "Group not found. Please create the group before adding participants."))
                           }
                           else {
-                            complete(finalGroup)
+                            complete(finalGroup.get)
                           }
                       }
                     }
@@ -212,12 +213,13 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
                           val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
                           val groupId: String = message.receiver.toUpperCase
                           val finalGroup = DatabaseUtils.getGroup(groupId)
-                          if (finalGroup == null || !finalGroup.participants.contains(senderEmail)) {
+                          if (finalGroup.isEmpty || !finalGroup.get.participants.contains(senderEmail)) {
                             logger.error("Invalid groupID.")
-                            complete(OutputMessage(StatusCodes.NOT_FOUND.intValue(), "The group you mentioned either does not exist, or you are not a part of it."))
+                            complete(OutputMessage(StatusCodes.NOT_FOUND.intValue(),
+                              "The group you mentioned either does not exist, or you are not a part of it."))
                           }
                           else {
-                            DatabaseUtils.saveGroupChat(Chat(senderEmail, finalGroup.groupId, message.message))
+                            DatabaseUtils.saveGroupChat(Chat(senderEmail, finalGroup.get.groupId, message.message))
                             logger.info("Chat Saved!")
                             complete(OutputMessage(StatusCodes.OK.intValue(), "Message has been successfully sent."))
                           }
@@ -286,7 +288,7 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
                       case _ =>
                         val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
                         val group = DatabaseUtils.getGroup(groupId)
-                        if (group != null && group.participants.contains(senderEmail)) {
+                        if (group.isEmpty && group.get.participants.contains(senderEmail)) {
                           complete(SeqChat(DatabaseUtils.getGroupMessages(groupId)))
                         }
                         else {
@@ -310,3 +312,4 @@ object Routes extends App with UserJsonSupport with LoginRequestJsonSupport with
     case Failure(error) => println(s"Error : ${error.getMessage}")
   }
 }
+

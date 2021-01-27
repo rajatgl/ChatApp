@@ -29,6 +29,9 @@ libraryDependencies ++= Seq(
 
   //scala-test dependency
   "org.scalatest" %% "scalatest" % "3.2.2" % "test",
+  "org.scalamock" %% "scalamock" % "5.1.0" % Test,
+  "com.typesafe.akka" %% "akka-stream-testkit" % "2.5.32",
+  "com.typesafe.akka" %% "akka-http-testkit" % "10.2.2",
 
   //smtp dependency for mailing
   "com.github.daddykotex" %% "courier" % "3.0.0-M2" ,

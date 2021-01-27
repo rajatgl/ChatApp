@@ -19,7 +19,9 @@ import scala.util.{Failure, Success}
  * Author: Rajat G.L.
  */
 object UserManager {
+
   private val logger = Logger("UserManager")
+  private val smtpCode = 587
 
   /**
    *
@@ -30,9 +32,11 @@ object UserManager {
     val users = Await.result(DatabaseUtils.getUsers(user.email), 60.seconds)
     users.foreach(mainUser =>
       if (EncryptionManager.verify(mainUser, user.password)) {
-        if (!mainUser.verificationComplete)
-          return StatusCodes.UNAUTHORIZED.intValue() //user is not verified
-        return StatusCodes.OK.intValue() // user is verified and login successful
+        if (!mainUser.verificationComplete) {
+          StatusCodes.UNAUTHORIZED.intValue() //user is not verified
+        } else {
+          StatusCodes.OK.intValue() // user is verified and login successful
+        }
       }
     )
     StatusCodes.NOT_FOUND.intValue() //if user not found in the database
@@ -56,7 +60,7 @@ object UserManager {
     val token: String = TokenManager.generateToken(user.email)
     val longUrl = "http://localhost:9000/verify?token=" + token + "&email=" + user.email
 
-    val mailer = Mailer("smtp.gmail.com", 587)
+    val mailer = Mailer("smtp.gmail.com", smtpCode)
       .auth(true)
       .as(System.getenv("SENDER_EMAIL"), System.getenv("SENDER_PASSWORD"))
       .startTls(true)()
@@ -65,11 +69,15 @@ object UserManager {
       .subject("Token")
       .content(Text(s"Click on this link to verify your email address: $longUrl. Happy to serve you!")))
       .onComplete {
-        case Success(_) => logger.info(s"Verification email sent to ${user.email}"); return OutputMessage(220, "Verification link sent!")
-        case Failure(exception) => logger.error(s"Failed to send verification email: ${exception.getMessage}"); return OutputMessage(440, "Failed to verify user!")
+        case Success(_) =>
+          logger.info(s"Verification email sent to ${user.email}")
+          OutputMessage(StatusCodes.OK.intValue(), "Verification link sent!")
+        case Failure(exception) =>
+          logger.error(s"Failed to send verification email: ${exception.getMessage}")
+          OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "Failed to verify user!")
       }
 
-    OutputMessage(220, "Verification link sent!") //guaranteed return
+    OutputMessage(StatusCodes.OK.intValue(), "Verification link sent!") //guaranteed return
   }
 
   /**
@@ -78,7 +86,7 @@ object UserManager {
    * @param body  of the email to be sent
    */
   def sendEmail(email: String, body: String): Unit = {
-    val mailer = Mailer("smtp.gmail.com", 587)
+    val mailer = Mailer("smtp.gmail.com", smtpCode)
       .auth(true)
       .as(System.getenv("SENDER_EMAIL"), System.getenv("SENDER_PASSWORD"))
       .startTls(true)()

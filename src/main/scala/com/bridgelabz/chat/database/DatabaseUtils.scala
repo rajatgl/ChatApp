@@ -68,8 +68,9 @@ object DatabaseUtils {
    */
   def checkIfExists(email: String): Boolean = {
     val data = Await.result(getUsers, 10.seconds)
-    data.foreach(user => if (user.email.equalsIgnoreCase(email)) return true)
-    false
+    var userExists: Boolean = false
+    data.foreach(user => if (user.email.equalsIgnoreCase(email)) userExists = true)
+    userExists
   }
 
   /**
@@ -113,22 +114,24 @@ object DatabaseUtils {
    */
   def saveGroupChat(chat: Chat): Unit = {
 
-    val group: Group = getGroup(chat.receiver)
-    if (system != null)
-      for (user <- group.participants) {
-        if (!chat.sender.equalsIgnoreCase(user)) {
-          logger.info(s"Notification email scheduled for: ${user}")
-          system.scheduler.scheduleOnce(500 milliseconds) {
-            system.actorOf(Props[UserActor]).tell(Chat(chat.sender, user, chat.message + s"\nreceived on group ${group.groupName}"), ActorRef.noSender)
+    val group = getGroup(chat.receiver)
+    if (group.isDefined) {
+      if (system != null) {
+        for (user <- group.get.participants) {
+          if (!chat.sender.equalsIgnoreCase(user)) {
+            logger.info(s"Notification email scheduled for: ${user}")
+            system.scheduler.scheduleOnce(500 milliseconds) {
+              system.actorOf(Props[UserActor]).tell(Chat(chat.sender, user, chat.message + s"\nreceived on group ${group.get.groupName}"), ActorRef.noSender)
+            }
           }
         }
+      } else {
+        logger.error("Endpoints inactive")
       }
-    else {
-      logger.error("Endpoints inactive")
-    }
 
-    val future = DatabaseConfig.collectionForGroupChat.insertOne(chat).toFuture()
-    Await.result(future, 10.seconds)
+      val future = DatabaseConfig.collectionForGroupChat.insertOne(chat).toFuture()
+      Await.result(future, 10.seconds)
+    }
   }
 
   /**
@@ -179,26 +182,29 @@ object DatabaseUtils {
    */
   def addParticipants(groupId: String, users: Seq[String]): Unit = {
 
-    val group = getGroup(groupId)
-    var newGroup = Group(group.groupId, group.groupName, group.admin, group.participants)
-    if (group != null && users != null) {
+    val groupOp = getGroup(groupId)
+
+    if (groupOp.isDefined && users != null) {
+      val group = groupOp.get
+      var newGroup = Group(group.groupId, group.groupName, group.admin, group.participants)
       var participantsArray = newGroup.participants
       for (user <- users) {
         if (doesAccountExist(user) && !group.participants.contains(user)) {
           logger.info(s"${user} added to the group: ${group.groupName}")
           participantsArray = participantsArray :+ user
         }
-        else
+        else {
           logger.debug(s"${user} not added to the group: ${group.groupName}")
+        }
       }
 
       newGroup = Group(group.groupId, group.groupName, group.admin, participantsArray)
 
-      if (newGroup.participants != null && newGroup.participants.nonEmpty)
+      if (newGroup.participants != null && newGroup.participants.nonEmpty) {
         updateGroup(newGroup)
-      else
+      } else {
         logger.debug(s"Group:${newGroup.groupName} not updated.")
-
+      }
     }
   }
 
@@ -207,14 +213,15 @@ object DatabaseUtils {
    * @param groupId associated with required group instance
    * @return group instance
    */
-  def getGroup(groupId: String): Group = {
+  def getGroup(groupId: String): Option[Group] = {
     val groupFuture = DatabaseConfig.collectionForGroup.find(equal("groupId", groupId)).toFuture()
     val group = Await.result(groupFuture, 60.seconds)
 
-    if (group.nonEmpty)
-      group.head
-    else
-      null
+    if (group.nonEmpty) {
+      Option(group.head)
+    } else {
+      None
+    }
   }
 
   /**

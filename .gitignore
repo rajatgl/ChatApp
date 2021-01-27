@@ -24,3 +24,5 @@ target/
 .scala_dependencies
 .worksheet
 .bsp
+test/
+scalastyle-config.xml
