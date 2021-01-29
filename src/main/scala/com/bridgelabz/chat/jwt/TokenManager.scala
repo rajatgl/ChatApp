@@ -2,11 +2,9 @@ package com.bridgelabz.chat.jwt
 
 import java.util.concurrent.TimeUnit
 
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Directive1
-import akka.http.scaladsl.server.Directives.{complete, headerValueByName, optionalHeaderValueByName, provide}
+import akka.http.scaladsl.server.Directives.{complete, headerValueByName}
 import authentikat.jwt.{JsonWebToken, JwtClaimsSet, JwtHeader}
-import com.bridgelabz.chat.models.{OutputMessage, OutputMessageJsonFormat, User}
+import com.bridgelabz.chat.models.{OutputMessage, User}
 
 /**
  * Created on 1/8/2021.

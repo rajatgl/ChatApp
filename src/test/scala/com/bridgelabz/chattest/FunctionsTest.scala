@@ -2,7 +2,7 @@ package com.bridgelabz.chattest
 
 import akka.http.javadsl.model.StatusCodes
 import com.bridgelabz.chat.database.DatabaseUtils
-import com.bridgelabz.chat.models.User
+import com.bridgelabz.chat.models.{Chat, User}
 import org.mongodb.scala.result
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.flatspec.AnyFlatSpec
@@ -43,5 +43,23 @@ class FunctionsTest extends AnyFlatSpec with MockFactory {
     updateResult.isInstanceOf[result.UpdateResult]
   }
 
+  "Does Account Exists" should "return false if account does not exist" in {
+    !DatabaseUtils.doesAccountExist("test@gmail.com")
+  }
 
+  "Is Successful Login" should "return false for wrong username-password combination" in {
+    !DatabaseUtils.isSuccessfulLogin(TestVariables.user().email, TestVariables.user().password)
+  }
+
+  "Get Group" should "return None for bad group ID" in {
+    DatabaseUtils.getGroup(TestVariables.groupId()).isEmpty
+  }
+
+  "Get Messages" should "return a list of chats" in {
+    DatabaseUtils.getMessages("test@gmail.com").isInstanceOf[Seq[Chat]]
+  }
+
+  "Get Group Messages" should "return a list of chats" in {
+    DatabaseUtils.getGroupMessages("test").isInstanceOf[Seq[Chat]]
+  }
 }

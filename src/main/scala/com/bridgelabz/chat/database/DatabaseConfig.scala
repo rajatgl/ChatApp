@@ -11,7 +11,7 @@ import org.mongodb.scala.{MongoClient, MongoCollection, MongoDatabase}
  * Class: DbConfig.scala
  * Author: Rajat G.L.
  */
-protected object DatabaseConfig {
+protected class DatabaseConfig {
 
   val mongoClient: MongoClient = MongoClient()
   val databaseName: String = "ChatApp"

@@ -12,4 +12,8 @@ object TestVariables {
   def user(email: String = "invalidemail", password: String = "helloworld", verificationComplete: Boolean = false): User = {
     User(email, password, verificationComplete)
   }
+
+  def groupId(id: String = "badGroupId"): String ={
+    id
+  }
 }

@@ -46,4 +46,7 @@
 - Scalacrypt 0.5-SNAPSHOT
 
 ### Plugins Applied
-- SBT CPD
+- SBT CPD 2.0.0
+- Scala Style 1.0.0
+- SBT Coverage 1.6.1
+

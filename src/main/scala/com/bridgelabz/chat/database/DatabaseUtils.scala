@@ -2,7 +2,6 @@ package com.bridgelabz.chat.database
 
 import akka.actor.{ActorRef, Props}
 import akka.http.javadsl.model.StatusCodes
-import com.bridgelabz.chat.Routes
 import com.bridgelabz.chat.Routes.{executor, system}
 import com.bridgelabz.chat.models.{Chat, Group, User, UserActor}
 import com.bridgelabz.chat.users.EncryptionManager
@@ -19,7 +18,8 @@ import scala.concurrent.duration.DurationInt
  * Class: DatabaseUtils.scala
  * Author: Rajat G.L.
  */
-object DatabaseUtils {
+object DatabaseUtils extends DatabaseConfig {
+
   private val logger = Logger("DatabaseUtils")
 
   /**
@@ -37,22 +37,14 @@ object DatabaseUtils {
         StatusCodes.CONFLICT.intValue()
       }
       else {
-        if (Routes.system == null) {
-          //Endpoints are inactive.
-          logger.debug("Endpoints inactive")
-          StatusCodes.INTERNAL_SERVER_ERROR.intValue()
-        }
-        else {
-          val passwordEnc = EncryptionManager.encrypt(user)
-          val encryptedUser: User = User(user.email, passwordEnc, user.verificationComplete)
-          val future = DatabaseConfig.collection.insertOne(encryptedUser).toFuture()
-          Await.result(future, 60.seconds)
-          logger.info(s"${user.email} is inserted into db")
-          Routes.system.actorOf(Props[UserActor], user.email)
+        val passwordEnc = EncryptionManager.encrypt(user)
+        val encryptedUser: User = User(user.email, passwordEnc, user.verificationComplete)
+        val future = collection.insertOne(encryptedUser).toFuture()
+        Await.result(future, 60.seconds)
+        logger.info(s"${user.email} is inserted into db")
 
-          //"Registration Successful. Please login at: http://localhost:9000/login"
-          StatusCodes.OK.intValue()
-        }
+        //"Registration Successful. Please login at: http://localhost:9000/login"
+        StatusCodes.OK.intValue()
       }
     }
     else {
@@ -78,7 +70,7 @@ object DatabaseUtils {
    * @return all user instances in the database
    */
   def getUsers: Future[Seq[User]] = {
-    DatabaseConfig.collection.find().toFuture()
+    collection.find().toFuture()
   }
 
   /**
@@ -87,7 +79,7 @@ object DatabaseUtils {
    * @return user instances in the database associated with the given email
    */
   def getUsers(email: String): Future[Seq[User]] = {
-    DatabaseConfig.collection.find(equal("email", email)).toFuture()
+    collection.find(equal("email", email)).toFuture()
   }
 
   /**
@@ -96,7 +88,7 @@ object DatabaseUtils {
    * @return Updates isVerificationComplete param of User case class
    */
   def verifyEmail(email: String): Future[result.UpdateResult] = {
-    DatabaseConfig.collection.updateOne(equal("email", email), set("verificationComplete", true)).toFuture()
+    collection.updateOne(equal("email", email), set("verificationComplete", true)).toFuture()
   }
 
   /**
@@ -104,7 +96,7 @@ object DatabaseUtils {
    * @param chat instance to be saved into database
    */
   def saveChat(chat: Chat): Unit = {
-    val future = DatabaseConfig.collectionForChat.insertOne(chat).toFuture()
+    val future = collectionForChat.insertOne(chat).toFuture()
     Await.result(future, 10.seconds)
   }
 
@@ -129,7 +121,7 @@ object DatabaseUtils {
         logger.error("Endpoints inactive")
       }
 
-      val future = DatabaseConfig.collectionForGroupChat.insertOne(chat).toFuture()
+      val future = collectionForGroupChat.insertOne(chat).toFuture()
       Await.result(future, 10.seconds)
     }
   }
@@ -140,7 +132,7 @@ object DatabaseUtils {
    * @return boolean result of check operation
    */
   def doesAccountExist(email: String): Boolean = {
-    val dbFuture = DatabaseConfig.collection.find(equal("email", email)).toFuture()
+    val dbFuture = collection.find(equal("email", email)).toFuture()
     val users = Await.result(dbFuture, 10.seconds)
     users.nonEmpty
   }
@@ -152,9 +144,14 @@ object DatabaseUtils {
    * @return boolean result of this check operation
    */
   def isSuccessfulLogin(email: String, password: String): Boolean = {
-    val dbFuture = DatabaseConfig.collection.find(equal("email", email)).toFuture()
-    val user = Await.result(dbFuture, 10.seconds).head
-    EncryptionManager.verify(user, password)
+    val dbFuture = collection.find(equal("email", email)).toFuture()
+    val user = Await.result(dbFuture, 10.seconds)
+
+    if (user.nonEmpty) {
+      EncryptionManager.verify(user.head, password)
+    } else {
+      false
+    }
   }
 
   /**
@@ -162,7 +159,7 @@ object DatabaseUtils {
    * @param group instance to be saved into database
    */
   def saveGroup(group: Group): Unit = {
-    val groupFuture = DatabaseConfig.collectionForGroup.insertOne(group).toFuture()
+    val groupFuture = collectionForGroup.insertOne(group).toFuture()
     Await.result(groupFuture, 60.seconds)
   }
 
@@ -171,7 +168,7 @@ object DatabaseUtils {
    * @param group instance to be updated in the database
    */
   def updateGroup(group: Group): Unit = {
-    val fut = DatabaseConfig.collectionForGroup.updateOne(equal("groupId", group.groupId), set("participants", group.participants)).toFuture()
+    val fut = collectionForGroup.updateOne(equal("groupId", group.groupId), set("participants", group.participants)).toFuture()
     Await.result(fut, 60.seconds)
   }
 
@@ -190,11 +187,11 @@ object DatabaseUtils {
       var participantsArray = newGroup.participants
       for (user <- users) {
         if (doesAccountExist(user) && !group.participants.contains(user)) {
-          logger.info(s"${user} added to the group: ${group.groupName}")
+          logger.info(s"$user added to the group: ${group.groupName}")
           participantsArray = participantsArray :+ user
         }
         else {
-          logger.debug(s"${user} not added to the group: ${group.groupName}")
+          logger.debug(s"$user not added to the group: ${group.groupName}")
         }
       }
 
@@ -214,7 +211,7 @@ object DatabaseUtils {
    * @return group instance
    */
   def getGroup(groupId: String): Option[Group] = {
-    val groupFuture = DatabaseConfig.collectionForGroup.find(equal("groupId", groupId)).toFuture()
+    val groupFuture = collectionForGroup.find(equal("groupId", groupId)).toFuture()
     val group = Await.result(groupFuture, 60.seconds)
 
     if (group.nonEmpty) {
@@ -230,7 +227,7 @@ object DatabaseUtils {
    * @return sequence of chats received by provided user
    */
   def getMessages(email: String): Seq[Chat] = {
-    val chatFuture = DatabaseConfig.collectionForChat.find(equal("receiver", email)).toFuture()
+    val chatFuture = collectionForChat.find(equal("receiver", email)).toFuture()
     Await.result(chatFuture, 60.seconds)
   }
 
@@ -240,7 +237,7 @@ object DatabaseUtils {
    * @return sequence of chats received by the group
    */
   def getGroupMessages(groupId: String): Seq[Chat] = {
-    val groupChatFuture = DatabaseConfig.collectionForGroupChat.find(equal("receiver", groupId)).toFuture()
+    val groupChatFuture = collectionForGroupChat.find(equal("receiver", groupId)).toFuture()
     Await.result(groupChatFuture, 60.seconds)
   }
 

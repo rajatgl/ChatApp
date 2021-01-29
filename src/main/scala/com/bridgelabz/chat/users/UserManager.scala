@@ -30,16 +30,18 @@ object UserManager {
    */
   def userLogin(user: User): Int = {
     val users = Await.result(DatabaseUtils.getUsers(user.email), 60.seconds)
+    var returnStatus: Int = StatusCodes.NOT_FOUND.intValue()
     users.foreach(mainUser =>
       if (EncryptionManager.verify(mainUser, user.password)) {
         if (!mainUser.verificationComplete) {
-          StatusCodes.UNAUTHORIZED.intValue() //user is not verified
+          returnStatus = StatusCodes.UNAUTHORIZED.intValue() //user is not verified
         } else {
-          StatusCodes.OK.intValue() // user is verified and login successful
+          returnStatus = StatusCodes.OK.intValue() // user is verified and login successful
         }
       }
     )
-    StatusCodes.NOT_FOUND.intValue() //if user not found in the database
+
+    returnStatus
   }
 
   /**
