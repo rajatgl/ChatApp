@@ -13,9 +13,10 @@ class UserActor extends Actor {
   var logger: Logger = Logger("UserActor")
 
   override def receive: Receive = {
-    case Chat(sender, receiver, message) => logger.debug(s"Message ${message},was sent by ${sender} and received by ${receiver}")
+    case Chat(sender, receiver, message) => logger.debug(s"Message $message,was sent by $sender and received by $receiver")
       DatabaseUtils.saveChat(Chat(sender, receiver, message))
-      UserManager.sendEmail(receiver, s"Your message reads: ${message}\n\nThis was sent by ${sender}")
+      val userManager: UserManager = new UserManager
+      userManager.sendEmail(receiver, s"Your message reads: $message\n\nThis was sent by $sender")
   }
 }
 trait UserJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {

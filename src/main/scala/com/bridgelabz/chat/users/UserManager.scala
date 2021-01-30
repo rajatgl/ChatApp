@@ -5,11 +5,10 @@ import com.bridgelabz.chat.Routes.executor
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.models.{OutputMessage, User}
+import com.bridgelabz.chat.utils.Utilities.tryAwait
 import com.typesafe.scalalogging.Logger
 import courier.{Envelope, Mailer, Text}
 import javax.mail.internet.InternetAddress
-
-import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
@@ -18,7 +17,7 @@ import scala.util.{Failure, Success}
  * Class: UserManager.scala
  * Author: Rajat G.L.
  */
-object UserManager {
+class UserManager {
 
   private val logger = Logger("UserManager")
   private val smtpCode = 587
@@ -29,19 +28,24 @@ object UserManager {
    * @return status message of login operation
    */
   def userLogin(user: User): Int = {
-    val users = Await.result(DatabaseUtils.getUsers(user.email), 60.seconds)
-    var returnStatus: Int = StatusCodes.NOT_FOUND.intValue()
-    users.foreach(mainUser =>
-      if (EncryptionManager.verify(mainUser, user.password)) {
-        if (!mainUser.verificationComplete) {
-          returnStatus = StatusCodes.UNAUTHORIZED.intValue() //user is not verified
-        } else {
-          returnStatus = StatusCodes.OK.intValue() // user is verified and login successful
-        }
-      }
-    )
+    val users = tryAwait(DatabaseUtils.getUsers(user.email), 60.seconds)
 
-    returnStatus
+    var returnStatus: Int = StatusCodes.NOT_FOUND.intValue()
+    if(users.isDefined) {
+      users.get.foreach(mainUser =>
+        if (EncryptionManager.verify(mainUser, user.password)) {
+          if (!mainUser.verificationComplete) {
+            returnStatus = StatusCodes.UNAUTHORIZED.intValue() //user is not verified
+          } else {
+            returnStatus = StatusCodes.OK.intValue() // user is verified and login successful
+          }
+        }
+      )
+      returnStatus
+    }
+    else {
+      returnStatus
+    }
   }
 
   /**

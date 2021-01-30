@@ -30,7 +30,7 @@ object EncryptionManager {
 
   /**
    *
-   * @param user            the object fetched from the database- contains email and encrypted password
+   * @param user the object fetched from the database- contains email and encrypted password
    * @param enteredPassword the string entered by the user as password while logging in
    * @return true if login was successful, false otherwise
    */
@@ -39,6 +39,7 @@ object EncryptionManager {
     try {
       val passwordKey = user.email.getBytes.toSeq.toKey[SymmetricKeyArbitrary].get
       val mac = HmacSHA256(passwordKey, enteredPassword.getBytes).get
+
       mac.toString().equals(user.password)
     }
     catch {

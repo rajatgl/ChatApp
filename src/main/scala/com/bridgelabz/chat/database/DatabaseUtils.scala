@@ -5,12 +5,13 @@ import akka.http.javadsl.model.StatusCodes
 import com.bridgelabz.chat.Routes.{executor, system}
 import com.bridgelabz.chat.models.{Chat, Group, User, UserActor}
 import com.bridgelabz.chat.users.EncryptionManager
+import com.bridgelabz.chat.utils.Utilities.tryAwait
 import com.typesafe.scalalogging.Logger
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.Updates.set
 import org.mongodb.scala.result
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 /**
@@ -40,7 +41,7 @@ object DatabaseUtils extends DatabaseConfig {
         val passwordEnc = EncryptionManager.encrypt(user)
         val encryptedUser: User = User(user.email, passwordEnc, user.verificationComplete)
         val future = collection.insertOne(encryptedUser).toFuture()
-        Await.result(future, 60.seconds)
+        tryAwait(future, 60.seconds)
         logger.info(s"${user.email} is inserted into db")
 
         //"Registration Successful. Please login at: http://localhost:9000/login"
@@ -59,9 +60,12 @@ object DatabaseUtils extends DatabaseConfig {
    * @return boolean result of check operation
    */
   def checkIfExists(email: String): Boolean = {
-    val data = Await.result(getUsers, 10.seconds)
+    val users = tryAwait(getUsers, 10.seconds)
     var userExists: Boolean = false
-    data.foreach(user => if (user.email.equalsIgnoreCase(email)) userExists = true)
+
+    if(users.isDefined) {
+      users.get.foreach(user => if (user.email.equalsIgnoreCase(email)) userExists = true)
+    }
     userExists
   }
 
@@ -97,7 +101,7 @@ object DatabaseUtils extends DatabaseConfig {
    */
   def saveChat(chat: Chat): Unit = {
     val future = collectionForChat.insertOne(chat).toFuture()
-    Await.result(future, 10.seconds)
+    tryAwait(future, 10.seconds)
   }
 
   /**
@@ -112,7 +116,7 @@ object DatabaseUtils extends DatabaseConfig {
         for (user <- group.get.participants) {
           if (!chat.sender.equalsIgnoreCase(user)) {
             logger.info(s"Notification email scheduled for: ${user}")
-            system.scheduler.scheduleOnce(500 milliseconds) {
+            system.scheduler.scheduleOnce(500.milliseconds) {
               system.actorOf(Props[UserActor]).tell(Chat(chat.sender, user, chat.message + s"\nreceived on group ${group.get.groupName}"), ActorRef.noSender)
             }
           }
@@ -122,7 +126,7 @@ object DatabaseUtils extends DatabaseConfig {
       }
 
       val future = collectionForGroupChat.insertOne(chat).toFuture()
-      Await.result(future, 10.seconds)
+      tryAwait(future, 10.seconds)
     }
   }
 
@@ -133,7 +137,7 @@ object DatabaseUtils extends DatabaseConfig {
    */
   def doesAccountExist(email: String): Boolean = {
     val dbFuture = collection.find(equal("email", email)).toFuture()
-    val users = Await.result(dbFuture, 10.seconds)
+    val users = tryAwait(dbFuture, 10.seconds)
     users.nonEmpty
   }
 
@@ -145,10 +149,10 @@ object DatabaseUtils extends DatabaseConfig {
    */
   def isSuccessfulLogin(email: String, password: String): Boolean = {
     val dbFuture = collection.find(equal("email", email)).toFuture()
-    val user = Await.result(dbFuture, 10.seconds)
+    val user = tryAwait(dbFuture, 10.seconds)
 
-    if (user.nonEmpty) {
-      EncryptionManager.verify(user.head, password)
+    if (user.isDefined && user.get.nonEmpty) {
+      EncryptionManager.verify(user.get.head, password)
     } else {
       false
     }
@@ -160,7 +164,7 @@ object DatabaseUtils extends DatabaseConfig {
    */
   def saveGroup(group: Group): Unit = {
     val groupFuture = collectionForGroup.insertOne(group).toFuture()
-    Await.result(groupFuture, 60.seconds)
+    tryAwait(groupFuture, 60.seconds)
   }
 
   /**
@@ -169,7 +173,7 @@ object DatabaseUtils extends DatabaseConfig {
    */
   def updateGroup(group: Group): Unit = {
     val fut = collectionForGroup.updateOne(equal("groupId", group.groupId), set("participants", group.participants)).toFuture()
-    Await.result(fut, 60.seconds)
+    tryAwait(fut, 60.seconds)
   }
 
   /**
@@ -212,10 +216,10 @@ object DatabaseUtils extends DatabaseConfig {
    */
   def getGroup(groupId: String): Option[Group] = {
     val groupFuture = collectionForGroup.find(equal("groupId", groupId)).toFuture()
-    val group = Await.result(groupFuture, 60.seconds)
+    val group = tryAwait(groupFuture, 60.seconds)
 
-    if (group.nonEmpty) {
-      Option(group.head)
+    if (group.isDefined && group.get.nonEmpty) {
+      Option(group.get.head)
     } else {
       None
     }
@@ -228,7 +232,7 @@ object DatabaseUtils extends DatabaseConfig {
    */
   def getMessages(email: String): Seq[Chat] = {
     val chatFuture = collectionForChat.find(equal("receiver", email)).toFuture()
-    Await.result(chatFuture, 60.seconds)
+    tryAwait(chatFuture, 60.seconds).get
   }
 
   /**
@@ -238,7 +242,7 @@ object DatabaseUtils extends DatabaseConfig {
    */
   def getGroupMessages(groupId: String): Seq[Chat] = {
     val groupChatFuture = collectionForGroupChat.find(equal("receiver", groupId)).toFuture()
-    Await.result(groupChatFuture, 60.seconds)
+    tryAwait(groupChatFuture, 60.seconds).get
   }
 
 }

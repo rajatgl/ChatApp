@@ -18,6 +18,7 @@ object UserRoutes extends LoginRequestJsonSupport with OutputMessageJsonFormat {
 
   val loginLogger: Logger = Logger("loginRoute")
   val registerLogger: Logger = Logger("registerRoute")
+  val userManager: UserManager = new UserManager
 
   /**
    *
@@ -32,7 +33,7 @@ object UserRoutes extends LoginRequestJsonSupport with OutputMessageJsonFormat {
           //check if the user login was successful
           val user: User = User(request.email, request.password, verificationComplete = false)
           val encryptedUser: User = User(request.email, EncryptionManager.encrypt(user), verificationComplete = true)
-          val userLoginStatus: Int = UserManager.userLogin(user)
+          val userLoginStatus: Int = userManager.userLogin(user)
 
           if (userLoginStatus == StatusCodes.OK.intValue()) {
             loginLogger.info("User Login Successful.")
@@ -64,11 +65,11 @@ object UserRoutes extends LoginRequestJsonSupport with OutputMessageJsonFormat {
       path("register") {
         entity(Directives.as[LoginRequest]) { request =>
           val user: User = User(request.email, request.password, verificationComplete = false)
-          val userRegisterStatus: Int = UserManager.createNewUser(user)
+          val userRegisterStatus: Int = userManager.createNewUser(user)
 
           if (userRegisterStatus == StatusCodes.OK.intValue()) {
             registerLogger.info(s"Email verification started for ${request.email}.")
-            complete(UserManager.sendVerificationEmail(user))
+            complete(userManager.sendVerificationEmail(user))
           }
           else if (userRegisterStatus == StatusCodes.BAD_REQUEST.intValue()) {
             registerLogger.error("Invalid Email.")

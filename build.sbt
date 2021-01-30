@@ -9,6 +9,8 @@ scalaVersion := "2.12.2"
 resolvers ++= Seq("snapshots", "releases").map(Resolver.sonatypeRepo)
 resolvers += Resolver.sonatypeRepo("snapshots")
 
+coverageEnabled := true
+
 libraryDependencies ++= Seq(
 
   //akka essentials
@@ -29,7 +31,7 @@ libraryDependencies ++= Seq(
 
   //scala-test dependency
   "org.scalatest" %% "scalatest" % "3.2.2" % "test",
-  "org.scalamock" %% "scalamock" % "5.1.0" % Test,
+  "org.mockito" % "mockito-all" % "2.0.2-beta" % Test,
   "com.typesafe.akka" %% "akka-stream-testkit" % "2.5.32",
   "com.typesafe.akka" %% "akka-http-testkit" % "10.2.2",
 

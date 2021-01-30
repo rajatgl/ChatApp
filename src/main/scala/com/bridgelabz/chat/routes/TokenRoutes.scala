@@ -1,15 +1,13 @@
 package com.bridgelabz.chat.routes
 
 import akka.http.javadsl.model.StatusCodes
-import akka.http.scaladsl.server.Directives.{_symbol2NR, complete, concat, get, parameters, path}
+import akka.http.scaladsl.server.Directives.{_symbol2NR, complete, get, parameters, path}
 import akka.http.scaladsl.server.Route
-import com.bridgelabz.chat.Routes.logger
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.models.{OutputMessage, OutputMessageJsonFormat}
+import com.bridgelabz.chat.utils.Utilities.tryAwait
 import com.nimbusds.jose.JWSObject
 import com.typesafe.scalalogging.Logger
-
-import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
 /**
@@ -30,10 +28,10 @@ object TokenRoutes extends OutputMessageJsonFormat {
     path("verify") {
       parameters('token.as[String], 'email.as[String]) { (token, email) =>
         val jwsObject = JWSObject.parse(token)
-        val updateUserAsVerified = DatabaseUtils.verifyEmail(email)
-        Await.result(updateUserAsVerified, 60.seconds)
         if (jwsObject.getPayload.toJSONObject.get("email").equals(email)) {
           logger.info("User Verified & Registered. ")
+          val updateUserAsVerified = DatabaseUtils.verifyEmail(email)
+          tryAwait(updateUserAsVerified, 60.seconds)
           complete(OutputMessage(StatusCodes.OK.intValue(), "User successfully verified and registered!"))
         }
         else {
