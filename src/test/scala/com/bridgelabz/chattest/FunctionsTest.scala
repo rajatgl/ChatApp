@@ -5,7 +5,7 @@ import akka.http.javadsl.model.StatusCodes
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.models.{Chat, OutputMessage, User}
-import com.bridgelabz.chat.users.UserManager
+import com.bridgelabz.chat.users.{EncryptionManager, UserManager}
 import com.bridgelabz.chat.utils.Utilities.tryAwait
 import org.mongodb.scala.result
 import org.scalatest.flatspec.AnyFlatSpec
@@ -74,6 +74,30 @@ class FunctionsTest extends AnyFlatSpec {
     DatabaseUtils.getGroupMessages("test").isInstanceOf[Seq[Chat]]
   }
 
+  "Save Chat" should "return optional complete" in {
+    DatabaseUtils.saveChat(TestVariables.chat()).isDefined
+  }
+
+  "Save Group" should "return optional complete" in {
+    DatabaseUtils.saveGroup(TestVariables.group()).isDefined
+  }
+
+  "Save Group Chat" should "return optional complete when group exists" in {
+    DatabaseUtils.saveGroupChat(TestVariables.chat(receiver = "randomREMOVE")).isDefined
+  }
+
+  "Save Group Chat" should "return None when group is not created" in {
+    DatabaseUtils.saveGroupChat(TestVariables.chat(receiver = "random")).isEmpty
+  }
+
+  "Add Participants" should "execute without exceptions" in {
+    DatabaseUtils.addParticipants("randomREMOVE", Seq("randomUser"))
+  }
+
+  "Get Sent Messages" should "return a sequence of chats" in {
+    DatabaseUtils.getSentMessages("test@gmail.com").isInstanceOf[Seq[Chat]]
+  }
+
   //User Manager Tests
   "User Login" should "return NOT_FOUND status code if the account does not exist" in {
     (new UserManager).userLogin(TestVariables.user("testingREMOVE3@gmail.com")) == StatusCodes.NOT_FOUND.intValue()
@@ -128,6 +152,16 @@ class FunctionsTest extends AnyFlatSpec {
   "Get Claims" should "return a Map[String, String] for valid jwt token" in {
     val token = TokenManager.generateToken("test@gmail.com")
     TokenManager.getClaims(token).isInstanceOf[Map[String, String]]
+  }
+
+  //Encryption Manager
+  "Encrypt" should "return an encrypted string for a user object" in {
+    !EncryptionManager.encrypt(TestVariables.user()).isEmpty
+  }
+
+  "Verify" should "handle null user cases and return false" in {
+    //noinspection ScalaStyle
+    !EncryptionManager.verify(null, "hello")
   }
 
   //Utilities

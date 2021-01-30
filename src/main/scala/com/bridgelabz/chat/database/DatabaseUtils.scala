@@ -3,13 +3,14 @@ package com.bridgelabz.chat.database
 import akka.actor.{ActorRef, Props}
 import akka.http.javadsl.model.StatusCodes
 import com.bridgelabz.chat.Routes.{executor, system}
+import com.bridgelabz.chat.database.interfaces.{ChatDatabase, GroupDatabase, UserDatabase}
 import com.bridgelabz.chat.models.{Chat, Group, User, UserActor}
 import com.bridgelabz.chat.users.EncryptionManager
 import com.bridgelabz.chat.utils.Utilities.tryAwait
 import com.typesafe.scalalogging.Logger
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.Updates.set
-import org.mongodb.scala.result
+import org.mongodb.scala.{Completed, result}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -19,7 +20,10 @@ import scala.concurrent.duration.DurationInt
  * Class: DatabaseUtils.scala
  * Author: Rajat G.L.
  */
-object DatabaseUtils extends DatabaseConfig {
+object DatabaseUtils extends DatabaseConfig
+  with ChatDatabase
+  with UserDatabase
+  with GroupDatabase {
 
   private val logger = Logger("DatabaseUtils")
 
@@ -99,7 +103,7 @@ object DatabaseUtils extends DatabaseConfig {
    *
    * @param chat instance to be saved into database
    */
-  def saveChat(chat: Chat): Unit = {
+  def saveChat(chat: Chat): Option[Completed] = {
     val future = collectionForChat.insertOne(chat).toFuture()
     tryAwait(future, 10.seconds)
   }
@@ -108,7 +112,7 @@ object DatabaseUtils extends DatabaseConfig {
    *
    * @param chat instance to be saved into database
    */
-  def saveGroupChat(chat: Chat): Unit = {
+  def saveGroupChat(chat: Chat): Option[Completed] = {
 
     val group = getGroup(chat.receiver)
     if (group.isDefined) {
@@ -127,6 +131,9 @@ object DatabaseUtils extends DatabaseConfig {
 
       val future = collectionForGroupChat.insertOne(chat).toFuture()
       tryAwait(future, 10.seconds)
+    }
+    else{
+      None
     }
   }
 
@@ -162,7 +169,7 @@ object DatabaseUtils extends DatabaseConfig {
    *
    * @param group instance to be saved into database
    */
-  def saveGroup(group: Group): Unit = {
+  def saveGroup(group: Group): Option[Completed] = {
     val groupFuture = collectionForGroup.insertOne(group).toFuture()
     tryAwait(groupFuture, 60.seconds)
   }
@@ -171,7 +178,7 @@ object DatabaseUtils extends DatabaseConfig {
    *
    * @param group instance to be updated in the database
    */
-  def updateGroup(group: Group): Unit = {
+  def updateGroup(group: Group): Option[result.UpdateResult] = {
     val fut = collectionForGroup.updateOne(equal("groupId", group.groupId), set("participants", group.participants)).toFuture()
     tryAwait(fut, 60.seconds)
   }
@@ -232,6 +239,16 @@ object DatabaseUtils extends DatabaseConfig {
    */
   def getMessages(email: String): Seq[Chat] = {
     val chatFuture = collectionForChat.find(equal("receiver", email)).toFuture()
+    tryAwait(chatFuture, 60.seconds).get
+  }
+
+  /**
+   *
+   * @param email sender email who's sent messages need to be fetched
+   * @return sequence of chats received by provided user
+   */
+  def getSentMessages(email: String): Seq[Chat] = {
+    val chatFuture = collectionForChat.find(equal("sender", email)).toFuture()
     tryAwait(chatFuture, 60.seconds).get
   }
 

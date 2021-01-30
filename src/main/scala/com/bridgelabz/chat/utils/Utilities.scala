@@ -9,6 +9,13 @@ import scala.concurrent.{Await, Future}
  * Author: Rajat G.L.
  */
 object Utilities {
+  /**
+   *
+   * @param future Future instance to be awaited
+   * @param time timeout Span
+   * @tparam T generic object type to be extracted
+   * @return result else None in case of exception.
+   */
   def tryAwait[T](future: Future[T], time: Span): Option[T] = {
     try {
       Some(Await.result(future, time))

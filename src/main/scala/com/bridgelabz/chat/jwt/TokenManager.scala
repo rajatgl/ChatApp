@@ -45,25 +45,6 @@ object TokenManager {
 
   /**
    *
-   * @return authentication status message
-   */
-  def authenticated(outputMessage: OutputMessage): Unit = {
-
-    headerValueByName("Authorization") { tokenFromUser =>
-
-      val jwtToken = tokenFromUser.split(" ")
-      jwtToken(1) match {
-        case token if isTokenExpired(token) =>
-          complete(401 -> "Token has expired. Please login again.")
-
-        case token if !JsonWebToken.validate(token, secretKey) =>
-          complete(401 -> "Token is invalid. Please login again to generate a new one.")
-      }
-    }
-  }
-
-  /**
-   *
    * @param token to check if its expired
    * @return boolean result of the same
    */
