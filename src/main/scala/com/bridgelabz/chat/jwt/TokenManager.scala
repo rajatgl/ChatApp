@@ -1,10 +1,10 @@
 package com.bridgelabz.chat.jwt
 
 import java.util.concurrent.TimeUnit
-
-import akka.http.scaladsl.server.Directives.{complete, headerValueByName}
 import authentikat.jwt.{JsonWebToken, JwtClaimsSet, JwtHeader}
-import com.bridgelabz.chat.models.{OutputMessage, User}
+import com.bridgelabz.chat.constants.Constants
+import com.bridgelabz.chat.constants.Constants.tokenExpiryPeriodInDays
+import com.bridgelabz.chat.models.User
 
 /**
  * Created on 1/8/2021.
@@ -13,9 +13,8 @@ import com.bridgelabz.chat.models.{OutputMessage, User}
  */
 object TokenManager {
 
-  val secretKey = "a$iq!@oop"
-  val header = JwtHeader("HS256", "JWT")
-   val tokenExpiryPeriodInDays = 1
+  val secretKey: String = Constants.secretKey
+  val header: JwtHeader = JwtHeader("HS256", "JWT")
 
   /**
    *
@@ -33,11 +32,47 @@ object TokenManager {
     JsonWebToken(header, claimSet, secretKey)
   }
 
+
+  /**
+   *
+   * @param user instance to generate a unique token for
+   * @return token
+   */
   def generateLoginId(user: User): String = {
     val claimSet = JwtClaimsSet(
       Map(
         "user" -> (user.email + "!" + user.password),
         "expiredAt" -> (System.currentTimeMillis() + (24*60*60*1000))
+      )
+    )
+    JsonWebToken(header, claimSet, secretKey)
+  }
+
+  /**
+   *
+   * @param user instance to generate a unique token for
+   * @return invalid token
+   */
+  def generateInvalidLoginId(user: User): String = {
+    val claimSet = JwtClaimsSet(
+      Map(
+        "user" -> (user.email + "!" + user.password),
+        "expiredAt" -> (System.currentTimeMillis() + (24*60*60*1000))
+      )
+    )
+    JsonWebToken(header, claimSet, "invalidkey")
+  }
+
+  /**
+   *
+   * @param user instance to generate a unique token for
+   * @return expired token
+   */
+  def generateExpiredLoginId(user: User): String = {
+    val claimSet = JwtClaimsSet(
+      Map(
+        "user" -> (user.email + "!" + user.password),
+        "expiredAt" -> (System.currentTimeMillis() - (24*60*60*1000))
       )
     )
     JsonWebToken(header, claimSet, secretKey)

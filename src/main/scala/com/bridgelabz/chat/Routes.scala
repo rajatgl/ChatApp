@@ -5,11 +5,10 @@ import akka.http.javadsl.model.StatusCodes
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.{complete, concat, extractUri, handleExceptions}
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.models._
-import com.bridgelabz.chat.routes.ChatRoutes._
-import com.bridgelabz.chat.routes.UserRoutes._
-import com.bridgelabz.chat.routes.TokenRoutes._
-import com.bridgelabz.chat.routes.GroupRoutes._
+import com.bridgelabz.chat.routes.{ChatRoutes, GroupRoutes, TokenRoutes, UserRoutes}
+import com.bridgelabz.chat.users.UserManager
 import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.ExecutionContext
@@ -24,8 +23,9 @@ object Routes extends App
   with GroupNameJsonFormat
   with GroupAddUserJsonFormat
   with GroupJsonFormat
-  with SeqChatJsonSupport{
+  with SeqChatJsonSupport {
 
+  // $COVERAGE-OFF$
   //server configuration variables
   private val host = System.getenv("Host")
   private val port = System.getenv("Port").toInt
@@ -49,29 +49,49 @@ object Routes extends App
       }
   }
 
+  val databaseUtils = new DatabaseUtils
+  val userManager = new UserManager
+
   /**
    * handles all the get post requests to appropriate path endings
    *
    * @return Route object needed for server for binding
    */
-  def route: Route = {
+
+  // $COVERAGE-ON$
+  def route(databaseUtils: DatabaseUtils, userManager: UserManager): Route = {
+
+    val chatRoutes = new ChatRoutes(databaseUtils)
+    val groupRoutes = new GroupRoutes(databaseUtils)
+    val userRoutes = new UserRoutes(userManager)
+    val tokenRoutes = new TokenRoutes(databaseUtils)
+
     handleExceptions(exceptionHandler) {
       concat(
-        loginUserRoute,
-        registerUserRoute,
-        chatRoute,
-        getChatRoute,
-        createGroupRoute,
-        usersGroupRoute,
-        chatGroupRoute,
-        getChatGroupRoute,
-        verifyTokenRoute
+
+        //user routes
+        userRoutes.loginUserRoute,
+        userRoutes.registerUserRoute,
+
+        //chat routes
+        chatRoutes.chatRoute,
+        chatRoutes.getChatRoute,
+
+        //group routes
+        groupRoutes.createGroupRoute,
+        groupRoutes.usersGroupRoute,
+        groupRoutes.chatGroupRoute,
+        groupRoutes.getChatGroupRoute,
+
+        //token route
+        tokenRoutes.verifyTokenRoute
       )
     }
   }
 
+  // $COVERAGE-OFF$
   //binder for the server
-  val binder = Http().newServerAt(host, port).bind(route)
+  val binder = Http().newServerAt(host, port).bind(route(databaseUtils, userManager))
   binder.onComplete {
     case Success(serverBinding) => logger.info(s"Listening to ${serverBinding.localAddress}")
     case Failure(error) => logger.error(s"Error : ${error.getMessage}")

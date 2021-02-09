@@ -21,14 +21,14 @@ class UserManager {
 
   private val logger = Logger("UserManager")
   private val smtpCode = 587
-
+  private val databaseObj = new DatabaseUtils
   /**
    *
    * @param user instance to be logged in
    * @return status message of login operation
    */
   def userLogin(user: User): Int = {
-    val users = tryAwait(DatabaseUtils.getUsers(user.email), 60.seconds)
+    val users = tryAwait(databaseObj.getUsers(user.email), 60.seconds)
 
     var returnStatus: Int = StatusCodes.NOT_FOUND.intValue()
     if(users.isDefined) {
@@ -54,7 +54,7 @@ class UserManager {
    * @return status of the above insertion operation (2xx return preferable)
    */
   def createNewUser(user: User): Int = {
-    DatabaseUtils.saveUser(user)
+    databaseObj.saveUser(user)
   }
 
   /**

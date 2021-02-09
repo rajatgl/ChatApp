@@ -1,7 +1,8 @@
 package com.bridgelabz.chat.utils
 
 import org.scalatest.time.Span
-import scala.concurrent.{Await, Future}
+
+import scala.concurrent.{Await, Future, TimeoutException}
 
 /**
  * Created on 1/30/2021.
@@ -21,7 +22,8 @@ object Utilities {
       Some(Await.result(future, time))
     }
     catch {
-      case error: Throwable => error.printStackTrace()
+          //TODO: make specific exceptions
+      case throwable: TimeoutException => throwable.printStackTrace()
         None
     }
   }

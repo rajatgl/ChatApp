@@ -14,7 +14,7 @@ import com.typesafe.scalalogging.Logger
  * Class: GroupRoutes.scala
  * Author: Rajat G.L.
  */
-object GroupRoutes
+class GroupRoutes(databaseUtils: DatabaseUtils)
   extends GroupNameJsonFormat
     with OutputMessageJsonFormat
     with GroupAddUserJsonFormat
@@ -46,7 +46,7 @@ object GroupRoutes
                 val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
                 val uniqueId: String = (senderEmail + groupName.groupName).toUpperCase
                 val group: Group = Group(uniqueId, groupName.groupName, senderEmail, Array[String](senderEmail))
-                DatabaseUtils.saveGroup(group)
+                databaseUtils.saveGroup(group)
                 logger.info("Group Created.")
                 complete(OutputMessage(StatusCodes.OK.intValue(), "The group has been created successfully."))
             }
@@ -77,9 +77,9 @@ object GroupRoutes
               case _ =>
                 val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
                 val groupId: String = (senderEmail + users.groupName).toUpperCase
-                DatabaseUtils.addParticipants(groupId, users.participantEmails)
+                databaseUtils.addParticipants(groupId, users.participantEmails)
                 logger.info("New Participant Added.")
-                val finalGroup = DatabaseUtils.getGroup(groupId)
+                val finalGroup = databaseUtils.getGroup(groupId)
                 if (finalGroup.isEmpty) {
                   complete(OutputMessage(StatusCodes.NOT_FOUND.intValue(), "Group not found. Please create the group before adding participants."))
                 }
@@ -114,14 +114,14 @@ object GroupRoutes
               case _ =>
                 val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
                 val groupId: String = message.receiver.toUpperCase
-                val finalGroup = DatabaseUtils.getGroup(groupId)
+                val finalGroup = databaseUtils.getGroup(groupId)
                 if (finalGroup.isEmpty || !finalGroup.get.participants.contains(senderEmail)) {
                   logger.error("Invalid groupID.")
                   complete(OutputMessage(StatusCodes.NOT_FOUND.intValue(),
                     "The group you mentioned either does not exist, or you are not a part of it."))
                 }
                 else {
-                  DatabaseUtils.saveGroupChat(Chat(senderEmail, finalGroup.get.groupId, message.message))
+                  databaseUtils.saveGroupChat(Chat(senderEmail, finalGroup.get.groupId, message.message))
                   logger.info("Chat Saved!")
                   complete(OutputMessage(StatusCodes.OK.intValue(), "Message has been successfully sent."))
                 }
@@ -154,9 +154,9 @@ object GroupRoutes
 
               case _ =>
                 val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
-                val group = DatabaseUtils.getGroup(groupId)
-                if (group.isEmpty && group.get.participants.contains(senderEmail)) {
-                  complete(SeqChat(DatabaseUtils.getGroupMessages(groupId)))
+                val group = databaseUtils.getGroup(groupId)
+                if (group.isDefined && group.get.participants.contains(senderEmail)) {
+                  complete(SeqChat(databaseUtils.getGroupMessages(groupId)))
                 }
                 else {
                   complete(OutputMessage(StatusCodes.NOT_FOUND.intValue(), "Group not found, or you are not a member of this group."))

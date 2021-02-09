@@ -3,6 +3,7 @@ package com.bridgelabz.chat.database
 import akka.actor.{ActorRef, Props}
 import akka.http.javadsl.model.StatusCodes
 import com.bridgelabz.chat.Routes.{executor, system}
+import com.bridgelabz.chat.constants.Constants.emailRegex
 import com.bridgelabz.chat.database.interfaces.{ChatDatabase, GroupDatabase, UserDatabase}
 import com.bridgelabz.chat.models.{Chat, Group, User, UserActor}
 import com.bridgelabz.chat.users.EncryptionManager
@@ -20,7 +21,7 @@ import scala.concurrent.duration.DurationInt
  * Class: DatabaseUtils.scala
  * Author: Rajat G.L.
  */
-object DatabaseUtils extends DatabaseConfig
+class DatabaseUtils extends DatabaseConfig
   with ChatDatabase
   with UserDatabase
   with GroupDatabase {
@@ -33,7 +34,6 @@ object DatabaseUtils extends DatabaseConfig
    * @return status message of the insertion operation
    */
   def saveUser(user: User): Int = {
-    val emailRegex = "^[a-zA-Z0-9+-._]+@[a-zA-Z0-9.-]+$"
     if (user.email.matches(emailRegex)) {
       val ifUserExists: Boolean = checkIfExists(user.email)
       if (ifUserExists) {
@@ -95,8 +95,9 @@ object DatabaseUtils extends DatabaseConfig
    * @param email whos verificationComplete param needs to be updated
    * @return Updates isVerificationComplete param of User case class
    */
-  def verifyEmail(email: String): Future[result.UpdateResult] = {
-    collection.updateOne(equal("email", email), set("verificationComplete", true)).toFuture()
+  def verifyEmail(email: String): Option[result.UpdateResult] = {
+    val updateUserAsVerified = collection.updateOne(equal("email", email), set("verificationComplete", true)).toFuture()
+    tryAwait(updateUserAsVerified, 60.seconds)
   }
 
   /**
@@ -116,18 +117,16 @@ object DatabaseUtils extends DatabaseConfig
 
     val group = getGroup(chat.receiver)
     if (group.isDefined) {
-      if (system != null) {
         for (user <- group.get.participants) {
           if (!chat.sender.equalsIgnoreCase(user)) {
             logger.info(s"Notification email scheduled for: ${user}")
-            system.scheduler.scheduleOnce(500.milliseconds) {
-              system.actorOf(Props[UserActor]).tell(Chat(chat.sender, user, chat.message + s"\nreceived on group ${group.get.groupName}"), ActorRef.noSender)
+            if(system != null) {
+              system.scheduler.scheduleOnce(500.milliseconds) {
+                system.actorOf(Props[UserActor]).tell(Chat(chat.sender, user, chat.message + s"\nreceived on group ${group.get.groupName}"), ActorRef.noSender)
+              }
             }
           }
         }
-      } else {
-        logger.error("Endpoints inactive")
-      }
 
       val future = collectionForGroupChat.insertOne(chat).toFuture()
       tryAwait(future, 10.seconds)

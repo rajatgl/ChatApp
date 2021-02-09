@@ -15,87 +15,89 @@ import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 
 class FunctionsTest extends AnyFlatSpec {
 
+  private val databaseUtils = new DatabaseUtils
+
   //Database Utils Functions
   "Save User" should "return BAD_REQUEST status code if the email has bad pattern" in {
-    DatabaseUtils.saveUser(TestVariables.user()) == StatusCodes.BAD_REQUEST.intValue()
+    databaseUtils.saveUser(TestVariables.user()) == StatusCodes.BAD_REQUEST.intValue()
   }
 
   "Save User" should "return CONFLICT status code if the email already exists" in {
-    DatabaseUtils.saveUser(TestVariables.user("test@gmail.com")) == StatusCodes.CONFLICT.intValue()
+    databaseUtils.saveUser(TestVariables.user("test@gmail.com")) == StatusCodes.CONFLICT.intValue()
   }
 
   "Save User" should "return OK status code if the user was added" in {
-    DatabaseUtils.saveUser(TestVariables.user("testingREMOVE@gmail.com")) == StatusCodes.OK.intValue()
+    databaseUtils.saveUser(TestVariables.user("testingREMOVE@gmail.com")) == StatusCodes.OK.intValue()
   }
 
   "Check If Exists" should "return true if the email already exists" in {
-    DatabaseUtils.checkIfExists("test@gmail.com")
+    databaseUtils.checkIfExists("test@gmail.com")
   }
 
   "Check If Exists" should "return false if the email does not exist" in {
-    DatabaseUtils.checkIfExists("testingREMOVE2@gmail.com")
+    databaseUtils.checkIfExists("testingREMOVE2@gmail.com")
   }
 
   behavior of "Get Users"
   it should "return a list of users from the database" in {
-      val list = Await.result(DatabaseUtils.getUsers, 60.seconds)
+      val list = Await.result(databaseUtils.getUsers, 60.seconds)
       list.isInstanceOf[Seq[User]]
   }
 
   behavior of "Get Users with an email"
   it should "return a list of users from the database" in {
-    val list = Await.result(DatabaseUtils.getUsers("testingREMOVE@gmail.com"), 60.seconds)
+    val list = Await.result(databaseUtils.getUsers("testingREMOVE@gmail.com"), 60.seconds)
     list.isInstanceOf[Seq[User]]
   }
 
   behavior of "Verify Email"
   it should "return an update result of the operation" in {
-    val updateResult = Await.result(DatabaseUtils.verifyEmail("testingREMOVE@gmail.com"), 60.seconds)
-    updateResult.isInstanceOf[result.UpdateResult]
+    val updateResult = databaseUtils.verifyEmail("testingREMOVE@gmail.com")
+    updateResult.isDefined && updateResult.get.isInstanceOf[result.UpdateResult]
   }
 
   "Does Account Exists" should "return false if account does not exist" in {
-    !DatabaseUtils.doesAccountExist("test@gmail.com")
+    !databaseUtils.doesAccountExist("test@gmail.com")
   }
 
   "Is Successful Login" should "return false for wrong username-password combination" in {
-    !DatabaseUtils.isSuccessfulLogin(TestVariables.user().email, TestVariables.user().password)
+    !databaseUtils.isSuccessfulLogin(TestVariables.user().email, TestVariables.user().password)
   }
 
   "Get Group" should "return None for bad group ID" in {
-    DatabaseUtils.getGroup(TestVariables.groupId()).isEmpty
+    databaseUtils.getGroup(TestVariables.groupId()).isEmpty
   }
 
   "Get Messages" should "return a list of chats" in {
-    DatabaseUtils.getMessages("test@gmail.com").isInstanceOf[Seq[Chat]]
+    databaseUtils.getMessages("test@gmail.com").isInstanceOf[Seq[Chat]]
   }
 
   "Get Group Messages" should "return a list of chats" in {
-    DatabaseUtils.getGroupMessages("test").isInstanceOf[Seq[Chat]]
+    databaseUtils.getGroupMessages("test").isInstanceOf[Seq[Chat]]
   }
 
   "Save Chat" should "return optional complete" in {
-    DatabaseUtils.saveChat(TestVariables.chat()).isDefined
+    databaseUtils.saveChat(TestVariables.chat()).isDefined
   }
 
   "Save Group" should "return optional complete" in {
-    DatabaseUtils.saveGroup(TestVariables.group()).isDefined
+    databaseUtils.saveGroup(TestVariables.group()).isDefined
   }
 
   "Save Group Chat" should "return optional complete when group exists" in {
-    DatabaseUtils.saveGroupChat(TestVariables.chat(receiver = "randomREMOVE")).isDefined
+    databaseUtils.saveGroupChat(TestVariables.chat(receiver = "randomREMOVE")).isDefined
   }
 
   "Save Group Chat" should "return None when group is not created" in {
-    DatabaseUtils.saveGroupChat(TestVariables.chat(receiver = "random")).isEmpty
+    databaseUtils.saveGroupChat(TestVariables.chat(receiver = "random")).isEmpty
   }
 
   "Add Participants" should "execute without exceptions" in {
-    DatabaseUtils.addParticipants("randomREMOVE", Seq("randomUser"))
+    databaseUtils.addParticipants("randomREMOVE", Seq("randomUser"))
   }
 
   "Get Sent Messages" should "return a sequence of chats" in {
-    DatabaseUtils.getSentMessages("test@gmail.com").isInstanceOf[Seq[Chat]]
+    databaseUtils.getSentMessages("test@gmail.com").isInstanceOf[Seq[Chat]]
   }
 
   //User Manager Tests
@@ -121,7 +123,7 @@ class FunctionsTest extends AnyFlatSpec {
     }
     catch{
       case nullEx: NullPointerException => true
-      case _ => false
+      case _: Throwable => false
     }
   }
 

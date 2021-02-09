@@ -1,5 +1,6 @@
 package com.bridgelabz.chat.database
 
+import com.bridgelabz.chat.constants.Constants
 import com.bridgelabz.chat.models.{Chat, Group, User}
 import org.bson.codecs.configuration.{CodecProvider, CodecRegistries, CodecRegistry}
 import org.mongodb.scala.MongoClient.DEFAULT_CODEC_REGISTRY
@@ -14,7 +15,7 @@ import org.mongodb.scala.{MongoClient, MongoCollection, MongoDatabase}
 protected trait DatabaseConfig {
 
   val mongoClient: MongoClient = MongoClient()
-  val databaseName: String = "ChatApp"
+  val databaseName: String = Constants.databaseName
 
   //codec providers and registries
   val codecProvider: CodecProvider = Macros.createCodecProvider[User]()
@@ -37,17 +38,17 @@ protected trait DatabaseConfig {
 
   //respective collections
   val database: MongoDatabase = mongoClient.getDatabase(databaseName).withCodecRegistry(codecRegistry)
-  val collectionName: String = "Users"
+  val collectionName: String = Constants.collectionName
   val collection: MongoCollection[User] = database.getCollection(collectionName)
 
   val databaseForChat: MongoDatabase = mongoClient.getDatabase(databaseName).withCodecRegistry(codecRegistryForChat)
-  val collectionNameForChat: String = "Chats"
+  val collectionNameForChat: String = Constants.collectionNameForChat
   val collectionForChat: MongoCollection[Chat] =databaseForChat.getCollection(collectionNameForChat)
 
-  val collectionNameForGroupChat: String = "GroupChat"
+  val collectionNameForGroupChat: String = Constants.collectionNameForGroupChat
   val collectionForGroupChat: MongoCollection[Chat] =databaseForChat.getCollection(collectionNameForGroupChat)
 
   val databaseForGroup: MongoDatabase = mongoClient.getDatabase(databaseName).withCodecRegistry(codecRegistryForGroup)
-  val collectionNameForGroup: String = "Groups"
+  val collectionNameForGroup: String = Constants.collectionNameForGroup
   val collectionForGroup: MongoCollection[Group] = databaseForGroup.getCollection(collectionNameForGroup)
 }

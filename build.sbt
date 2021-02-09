@@ -30,8 +30,8 @@ libraryDependencies ++= Seq(
   "com.nimbusds" % "nimbus-jose-jwt" % "9.3",
 
   //scala-test dependency
-  "org.scalatest" %% "scalatest" % "3.2.2" % "test",
-  "org.mockito" % "mockito-all" % "2.0.2-beta" % Test,
+  "org.scalatest" %% "scalatest" % "3.2.2" % Test,
+  "org.scalatestplus" %% "mockito-3-4" % "3.2.3.0" % "test",
   "com.typesafe.akka" %% "akka-stream-testkit" % "2.5.32",
   "com.typesafe.akka" %% "akka-http-testkit" % "10.2.2",
 

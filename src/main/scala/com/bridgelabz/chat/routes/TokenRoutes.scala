@@ -15,7 +15,7 @@ import scala.concurrent.duration.DurationInt
  * Class: TokenRoutes.scala
  * Author: Rajat G.L.
  */
-object TokenRoutes extends OutputMessageJsonFormat {
+class TokenRoutes(databaseUtils: DatabaseUtils) extends OutputMessageJsonFormat {
 
   val logger: Logger = Logger("TokenRoutes")
 
@@ -30,8 +30,7 @@ object TokenRoutes extends OutputMessageJsonFormat {
         val jwsObject = JWSObject.parse(token)
         if (jwsObject.getPayload.toJSONObject.get("email").equals(email)) {
           logger.info("User Verified & Registered. ")
-          val updateUserAsVerified = DatabaseUtils.verifyEmail(email)
-          tryAwait(updateUserAsVerified, 60.seconds)
+          val updateUserAsVerified = databaseUtils.verifyEmail(email)
           complete(OutputMessage(StatusCodes.OK.intValue(), "User successfully verified and registered!"))
         }
         else {
