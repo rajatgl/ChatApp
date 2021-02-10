@@ -36,17 +36,22 @@ class UserRoutes(userManager: UserManager) extends LoginRequestJsonSupport with 
         if (userLoginStatus == StatusCodes.OK.intValue()) {
           loginLogger.info("User Login Successful.")
           respondWithHeaders(RawHeader("Token", TokenManager.generateLoginId(encryptedUser))) {
-            complete(OutputMessage(userLoginStatus, "Logged in successfully. Happy to serve you!"))
+            complete(userLoginStatus -> OutputMessage(userLoginStatus, "Logged in successfully. Happy to serve you!"))
           }
         }
         else if (userLoginStatus == StatusCodes.NOT_FOUND.intValue()) {
           loginLogger.error("Account Not Registered.")
-          complete(OutputMessage(userLoginStatus,
-            "Login failed. Your account does not seem to exist. If you did not register yet, head to: http://localhost:9000/register"))
+          complete(userLoginStatus ->
+            OutputMessage(
+              userLoginStatus,
+              "Login failed. Your account does not seem to exist. If you did not register yet, head to: http://localhost:9000/register"
+            )
+          )
         }
         else {
           loginLogger.error("Account Verification Incomplete.")
-          complete(OutputMessage(userLoginStatus, "Login failed. Your account is not verified. Head to http://localhost:9000/verify for the same."))
+          complete(userLoginStatus ->
+            OutputMessage(userLoginStatus, "Login failed. Your account is not verified. Head to http://localhost:9000/verify for the same."))
         }
       }
     }
@@ -65,15 +70,15 @@ class UserRoutes(userManager: UserManager) extends LoginRequestJsonSupport with 
 
         if (userRegisterStatus == StatusCodes.OK.intValue()) {
           registerLogger.info(s"Email verification started for ${request.email}.")
-          complete(userManager.sendVerificationEmail(user))
+          complete(userRegisterStatus -> userManager.sendVerificationEmail(user))
         }
         else if (userRegisterStatus == StatusCodes.BAD_REQUEST.intValue()) {
           registerLogger.error("Invalid Email.")
-          complete(OutputMessage(userRegisterStatus, "Bad email, try again with a valid entry."))
+          complete(userRegisterStatus -> OutputMessage(userRegisterStatus, "Bad email, try again with a valid entry."))
         }
         else {
           registerLogger.error("Email is already registered. Provide a new one.")
-          complete(OutputMessage(userRegisterStatus, "User registration failed. E-mail is already registered."))
+          complete(userRegisterStatus -> OutputMessage(userRegisterStatus, "User registration failed. E-mail is already registered."))
         }
       }
     }

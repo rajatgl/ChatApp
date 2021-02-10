@@ -37,10 +37,12 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
             val jwtToken = tokenFromUser.split(" ")
             jwtToken(1) match {
               case token if isTokenExpired(token) =>
-                complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
+                complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
 
               case token if !JsonWebToken.validate(token, secretKey) =>
-                complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
+                complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
 
               case _ =>
                 val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
@@ -48,7 +50,8 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
                 val group: Group = Group(uniqueId, groupName.groupName, senderEmail, Array[String](senderEmail))
                 databaseUtils.saveGroup(group)
                 logger.info("Group Created.")
-                complete(OutputMessage(StatusCodes.OK.intValue(), "The group has been created successfully."))
+                complete(StatusCodes.OK.intValue() ->
+                  OutputMessage(StatusCodes.OK.intValue(), "The group has been created successfully."))
             }
           }
         }
@@ -69,10 +72,12 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
             val jwtToken = tokenFromUser.split(" ")
             jwtToken(1) match {
               case token if isTokenExpired(token) =>
-                complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
+                complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
 
               case token if !JsonWebToken.validate(token, secretKey) =>
-                complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
+                complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
 
               case _ =>
                 val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
@@ -81,7 +86,8 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
                 logger.info("New Participant Added.")
                 val finalGroup = databaseUtils.getGroup(groupId)
                 if (finalGroup.isEmpty) {
-                  complete(OutputMessage(StatusCodes.NOT_FOUND.intValue(), "Group not found. Please create the group before adding participants."))
+                  complete(StatusCodes.NOT_FOUND.intValue() ->
+                    OutputMessage(StatusCodes.NOT_FOUND.intValue(), "Group not found. Please create the group before adding participants."))
                 }
                 else {
                   complete(finalGroup.get)
@@ -106,10 +112,12 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
             val jwtToken = tokenFromUser.split(" ")
             jwtToken(1) match {
               case token if isTokenExpired(token) =>
-                complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
+                complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
 
               case token if !JsonWebToken.validate(token, secretKey) =>
-                complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
+                complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
 
               case _ =>
                 val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
@@ -117,13 +125,13 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
                 val finalGroup = databaseUtils.getGroup(groupId)
                 if (finalGroup.isEmpty || !finalGroup.get.participants.contains(senderEmail)) {
                   logger.error("Invalid groupID.")
-                  complete(OutputMessage(StatusCodes.NOT_FOUND.intValue(),
+                  complete(StatusCodes.NOT_FOUND.intValue() -> OutputMessage(StatusCodes.NOT_FOUND.intValue(),
                     "The group you mentioned either does not exist, or you are not a part of it."))
                 }
                 else {
                   databaseUtils.saveGroupChat(Chat(senderEmail, finalGroup.get.groupId, message.message))
                   logger.info("Chat Saved!")
-                  complete(OutputMessage(StatusCodes.OK.intValue(), "Message has been successfully sent."))
+                  complete(StatusCodes.OK.intValue() -> OutputMessage(StatusCodes.OK.intValue(), "Message has been successfully sent."))
                 }
             }
           }
@@ -147,10 +155,11 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
             val jwtToken = tokenFromUser.split(" ")
             jwtToken(1) match {
               case token if isTokenExpired(token) =>
-                complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
+                complete(StatusCodes.UNAUTHORIZED.intValue() -> OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
 
               case token if !JsonWebToken.validate(token, secretKey) =>
-                complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
+                complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
 
               case _ =>
                 val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
@@ -159,7 +168,8 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
                   complete(SeqChat(databaseUtils.getGroupMessages(groupId)))
                 }
                 else {
-                  complete(OutputMessage(StatusCodes.NOT_FOUND.intValue(), "Group not found, or you are not a member of this group."))
+                  complete(StatusCodes.NOT_FOUND.intValue() ->
+                    OutputMessage(StatusCodes.NOT_FOUND.intValue(), "Group not found, or you are not a member of this group."))
                 }
             }
           }

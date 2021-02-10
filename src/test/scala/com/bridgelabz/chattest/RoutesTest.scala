@@ -75,7 +75,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       )
 
       postRequest ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.BadRequest)
       }
     }
 
@@ -103,7 +103,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       )
 
       postRequest ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Conflict)
       }
     }
 
@@ -145,7 +145,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
       postRequest ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.NotFound)
       }
     }
 
@@ -166,7 +166,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
       postRequest ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -208,7 +208,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
       postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.NotFound)
       }
     }
 
@@ -229,7 +229,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
       postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateInvalidLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -251,7 +251,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
       postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateExpiredLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -271,7 +271,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val getRequest = Get("/chat")
 
       getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateInvalidLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -281,7 +281,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val getRequest = Get("/chat")
 
       getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateExpiredLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -333,7 +333,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       )
 
       postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateInvalidLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -359,7 +359,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       )
 
       postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateExpiredLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -413,7 +413,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       )
 
       postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateInvalidLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -440,7 +440,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       )
 
       postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateExpiredLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -467,7 +467,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       )
 
       postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.NotFound)
       }
     }
 
@@ -525,7 +525,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       )
 
       postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateInvalidLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -554,7 +554,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       )
 
       postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateExpiredLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -583,7 +583,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       )
 
       postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.NotFound)
       }
     }
 
@@ -613,7 +613,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val getRequest = Get("/group/chat?groupId=RANDOMRANDOM")
 
       getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateInvalidLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -628,7 +628,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val getRequest = Get("/group/chat?groupId=RANDOMRANDOM")
 
       getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateExpiredLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -643,7 +643,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val getRequest = Get("/group/chat?groupId=RANDOMRANDOM")
 
       getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateExpiredLoginId(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.Unauthorized)
       }
     }
 
@@ -667,7 +667,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val getRequest = Get(s"/verify?token=${TokenManager.generateToken(user.email)}&email=${user.email}invalid")
 
       getRequest ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
-        status.equals(StatusCodes.OK)
+        status.equals(StatusCodes.NotAcceptable)
       }
     }
   }

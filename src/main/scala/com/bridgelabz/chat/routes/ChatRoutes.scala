@@ -35,10 +35,12 @@ class ChatRoutes(databaseUtils: DatabaseUtils) extends CommunicateJsonSupport wi
           val jwtToken = token.split(" ")
           jwtToken(1) match {
             case token if isTokenExpired(token) =>
-              complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
+              complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
 
             case token if !JsonWebToken.validate(token, secretKey) =>
-              complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
+              complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
 
             case _ =>
               val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
@@ -47,11 +49,13 @@ class ChatRoutes(databaseUtils: DatabaseUtils) extends CommunicateJsonSupport wi
                 system.scheduler.scheduleOnce(500.milliseconds) {
                   system.actorOf(Props[UserActor]).tell(Chat(senderEmail, message.receiver, message.message), ActorRef.noSender)
                 }
-                complete(OutputMessage(StatusCodes.OK.intValue(), "The Message has been transmitted."))
+                complete(StatusCodes.OK.intValue() ->
+                  OutputMessage(StatusCodes.OK.intValue(), "The Message has been transmitted."))
               }
               else {
                 logger.error("Receiver Email isn't Registered. ")
-                complete(OutputMessage(StatusCodes.NOT_FOUND.intValue(), "The receiver does not seem to be registered with us."))
+                complete(StatusCodes.NOT_FOUND.intValue() ->
+                  OutputMessage(StatusCodes.NOT_FOUND.intValue(), "The receiver does not seem to be registered with us."))
               }
           }
         }
@@ -71,14 +75,16 @@ class ChatRoutes(databaseUtils: DatabaseUtils) extends CommunicateJsonSupport wi
         val jwtToken = tokenFromUser.split(" ")
         jwtToken(1) match {
           case token if isTokenExpired(token) =>
-            complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
+            complete(StatusCodes.UNAUTHORIZED.intValue() ->
+              OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
 
           case token if !JsonWebToken.validate(token, secretKey) =>
-            complete(OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
+            complete(StatusCodes.UNAUTHORIZED.intValue() ->
+              OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
 
           case _ =>
             val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
-            complete(SeqChat(databaseUtils.getMessages(senderEmail)))
+            complete(StatusCodes.OK.intValue() -> SeqChat(databaseUtils.getMessages(senderEmail)))
         }
       }
     }

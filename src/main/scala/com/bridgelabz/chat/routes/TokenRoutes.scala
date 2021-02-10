@@ -31,11 +31,13 @@ class TokenRoutes(databaseUtils: DatabaseUtils) extends OutputMessageJsonFormat 
         if (jwsObject.getPayload.toJSONObject.get("email").equals(email)) {
           logger.info("User Verified & Registered. ")
           val updateUserAsVerified = databaseUtils.verifyEmail(email)
-          complete(OutputMessage(StatusCodes.OK.intValue(), "User successfully verified and registered!"))
+          complete(StatusCodes.OK.intValue() ->
+            OutputMessage(StatusCodes.OK.intValue(), "User successfully verified and registered!"))
         }
         else {
           logger.error(s"User Verification Failed- Email used: $email and token used: $token.")
-          complete(OutputMessage(StatusCodes.NOT_ACCEPTABLE.intValue(), "User could not be verified- this token seems to be invalid!"))
+          complete(StatusCodes.NOT_ACCEPTABLE.intValue() ->
+            OutputMessage(StatusCodes.NOT_ACCEPTABLE.intValue(), "User could not be verified- this token seems to be invalid!"))
         }
       }
     }
