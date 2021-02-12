@@ -7,6 +7,10 @@ import com.bridgelabz.chat.users.UserManager
 import com.typesafe.scalalogging.Logger
 import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 
+import com.bridgelabz.chat.Routes.executor
+
+import scala.util.{Failure, Success}
+
 final case class User(email: String, password: String, verificationComplete: Boolean)
 class UserActor(databaseUtils: DatabaseUtils = new DatabaseUtils) extends Actor {
 
@@ -15,9 +19,14 @@ class UserActor(databaseUtils: DatabaseUtils = new DatabaseUtils) extends Actor 
   override def receive: Receive = {
     case Chat(sender, receiver, message) =>
       logger.debug(s"Message $message,was sent by $sender and received by $receiver")
-      databaseUtils.saveChat(Chat(sender, receiver, message))
-      val userManager: UserManager = new UserManager
-      userManager.sendEmail(receiver, s"Your message reads: $message\n\nThis was sent by $sender")
+      val futureChat = databaseUtils.saveChat(Chat(sender, receiver, message))
+
+      futureChat.onComplete{
+        case Success(_) => val userManager: UserManager = new UserManager
+          userManager.sendEmail(receiver, s"Your message reads: $message\n\nThis was sent by $sender")
+
+        case Failure(exception) => logger.error(exception.getMessage)
+      }
   }
 }
 trait UserJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {

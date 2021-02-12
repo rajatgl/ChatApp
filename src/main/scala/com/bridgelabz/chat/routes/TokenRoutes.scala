@@ -1,14 +1,14 @@
 package com.bridgelabz.chat.routes
 
 import akka.http.javadsl.model.StatusCodes
-import akka.http.scaladsl.server.Directives.{_symbol2NR, complete, get, parameters, path}
+import akka.http.scaladsl.server.Directives.{_symbol2NR, complete, get, onComplete, parameters, path}
 import akka.http.scaladsl.server.Route
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.models.{OutputMessage, OutputMessageJsonFormat}
-import com.bridgelabz.chat.utils.Utilities.tryAwait
 import com.nimbusds.jose.JWSObject
 import com.typesafe.scalalogging.Logger
-import scala.concurrent.duration.DurationInt
+
+import scala.util.{Failure, Success}
 
 /**
  * Created on 1/29/2021.
@@ -31,8 +31,14 @@ class TokenRoutes(databaseUtils: DatabaseUtils) extends OutputMessageJsonFormat 
         if (jwsObject.getPayload.toJSONObject.get("email").equals(email)) {
           logger.info("User Verified & Registered. ")
           val updateUserAsVerified = databaseUtils.verifyEmail(email)
-          complete(StatusCodes.OK.intValue() ->
-            OutputMessage(StatusCodes.OK.intValue(), "User successfully verified and registered!"))
+
+          onComplete(updateUserAsVerified){
+            case Success(_) => complete(StatusCodes.OK.intValue() -> OutputMessage(StatusCodes.OK.intValue(), "User successfully verified and registered!"))
+            case Failure(_) => complete(StatusCodes.INTERNAL_SERVER_ERROR.intValue() ->
+              OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "Could not verify the user.")
+            )
+          }
+
         }
         else {
           logger.error(s"User Verification Failed- Email used: $email and token used: $token.")

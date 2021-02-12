@@ -3,9 +3,11 @@ package com.bridgelabz.chat.database.interfaces
 import com.bridgelabz.chat.models.Group
 import org.mongodb.scala.{Completed, result}
 
+import scala.concurrent.Future
+
 trait GroupDatabase {
 
-  def saveGroup(group: Group): Option[Completed]
-  def updateGroup(group: Group): Option[result.UpdateResult]
-  def getGroup(groupId: String): Option[Group]
+  def saveGroup(group: Group): Future[Completed]
+  def updateGroup(group: Group): Future[result.UpdateResult]
+  def getGroup(groupId: String): Future[Seq[Group]]
 }

@@ -3,7 +3,7 @@ package com.bridgelabz.chat.routes
 import akka.actor.{ActorRef, Props}
 import akka.http.javadsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directives, Route}
-import akka.http.scaladsl.server.Directives.{complete, entity, headerValueByName, path, post}
+import akka.http.scaladsl.server.Directives.{complete, entity, headerValueByName, onComplete, path, post}
 import authentikat.jwt.JsonWebToken
 import com.bridgelabz.chat.Routes.{executor, system}
 import com.bridgelabz.chat.database.DatabaseUtils
@@ -12,6 +12,7 @@ import com.bridgelabz.chat.models.{Chat, Communicate, CommunicateJsonSupport, Ou
 import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.duration.DurationInt
+import scala.util.{Failure, Success}
 
 /**
  * Created on 1/29/2021.
@@ -84,7 +85,13 @@ class ChatRoutes(databaseUtils: DatabaseUtils) extends CommunicateJsonSupport wi
 
           case _ =>
             val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
-            complete(StatusCodes.OK.intValue() -> SeqChat(databaseUtils.getMessages(senderEmail)))
+            onComplete(databaseUtils.getMessages(senderEmail)){
+              case Success(value) =>
+                complete(StatusCodes.OK.intValue() -> SeqChat(value))
+              case Failure(exception) =>
+                logger.error(exception.getMessage)
+                complete(StatusCodes.INTERNAL_SERVER_ERROR.intValue() -> OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(),"Internal Server Error"))
+            }
         }
       }
     }

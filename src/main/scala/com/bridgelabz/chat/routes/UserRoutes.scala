@@ -2,12 +2,16 @@ package com.bridgelabz.chat.routes
 
 import akka.http.javadsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.server.Directives.{complete, entity, path, post, respondWithHeaders}
+import akka.http.scaladsl.server.Directives.{complete, entity, onComplete, path, post, respondWithHeaders}
 import akka.http.scaladsl.server.{Directives, Route}
 import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.models.{LoginRequest, LoginRequestJsonSupport, OutputMessage, OutputMessageJsonFormat, User}
 import com.bridgelabz.chat.users.{EncryptionManager, UserManager}
 import com.typesafe.scalalogging.Logger
+import org.mongodb.scala.Completed
+
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 /**
  * Created on 1/29/2021.
@@ -66,19 +70,26 @@ class UserRoutes(userManager: UserManager) extends LoginRequestJsonSupport with 
     path("register") {
       entity(Directives.as[LoginRequest]) { request =>
         val user: User = User(request.email, request.password, verificationComplete = false)
-        val userRegisterStatus: Int = userManager.createNewUser(user)
+        val userRegisterStatus: (Int, Future[Completed]) = userManager.createNewUser(user)
 
-        if (userRegisterStatus == StatusCodes.OK.intValue()) {
+        if (userRegisterStatus._1 == StatusCodes.OK.intValue()) {
           registerLogger.info(s"Email verification started for ${request.email}.")
-          complete(userRegisterStatus -> userManager.sendVerificationEmail(user))
+
+          onComplete(userRegisterStatus._2){
+            case Success(_) => complete(userManager.sendVerificationEmail(user))
+            case Failure(_) => complete(StatusCodes.INTERNAL_SERVER_ERROR.intValue() ->
+              OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "We encountered on error while registering you.")
+            )
+          }
+
         }
-        else if (userRegisterStatus == StatusCodes.BAD_REQUEST.intValue()) {
+        else if (userRegisterStatus._1 == StatusCodes.BAD_REQUEST.intValue()) {
           registerLogger.error("Invalid Email.")
-          complete(userRegisterStatus -> OutputMessage(userRegisterStatus, "Bad email, try again with a valid entry."))
+          complete(userRegisterStatus._1 -> OutputMessage(userRegisterStatus._1, "Bad email, try again with a valid entry."))
         }
         else {
           registerLogger.error("Email is already registered. Provide a new one.")
-          complete(userRegisterStatus -> OutputMessage(userRegisterStatus, "User registration failed. E-mail is already registered."))
+          complete(userRegisterStatus._1 -> OutputMessage(userRegisterStatus._1, "User registration failed. E-mail is already registered."))
         }
       }
     }

@@ -22,9 +22,7 @@ object Utilities {
       Some(Await.result(future, time))
     }
     catch {
-          //TODO: make specific exceptions
-      case throwable: TimeoutException => throwable.printStackTrace()
-        None
+      case throwable: TimeoutException => throwable.printStackTrace(); None
     }
   }
 }

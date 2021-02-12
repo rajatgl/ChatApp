@@ -1,8 +1,8 @@
 package com.bridgelabz.chat.database
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.javadsl.model.StatusCodes
-import com.bridgelabz.chat.Routes.{executor, system}
+import com.bridgelabz.chat.Routes
 import com.bridgelabz.chat.constants.Constants.emailRegex
 import com.bridgelabz.chat.database.interfaces.{ChatDatabase, GroupDatabase, UserDatabase}
 import com.bridgelabz.chat.models.{Chat, Group, User, UserActor}
@@ -13,8 +13,9 @@ import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.Updates.set
 import org.mongodb.scala.{Completed, result}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
+import scala.util.{Failure, Success}
 
 /**
  * Created on 1/8/2021.
@@ -33,28 +34,26 @@ class DatabaseUtils extends DatabaseConfig
    * @param user to be inserted into the database
    * @return status message of the insertion operation
    */
-  def saveUser(user: User): Int = {
+  def saveUser(user: User): (Int, Future[Completed]) = {
     if (user.email.matches(emailRegex)) {
       val ifUserExists: Boolean = checkIfExists(user.email)
       if (ifUserExists) {
         //A User with the same E-Mail already exists.
         logger.debug(s"${user.email} conflicted")
-        StatusCodes.CONFLICT.intValue()
+        (StatusCodes.CONFLICT.intValue(), Future.failed(new Exception(s"Email already exists: ${user.email}")))
       }
       else {
         val passwordEnc = EncryptionManager.encrypt(user)
         val encryptedUser: User = User(user.email, passwordEnc, user.verificationComplete)
         val future = collection.insertOne(encryptedUser).toFuture()
-        tryAwait(future, 60.seconds)
         logger.info(s"${user.email} is inserted into db")
-
         //"Registration Successful. Please login at: http://localhost:9000/login"
-        StatusCodes.OK.intValue()
+        (StatusCodes.OK.intValue(), future)
       }
     }
     else {
       //"E-Mail Validation Failed"
-      StatusCodes.BAD_REQUEST.intValue()
+      (StatusCodes.BAD_REQUEST.intValue(), Future.failed(new Exception("Bad pattern in email")))
     }
   }
 
@@ -66,8 +65,7 @@ class DatabaseUtils extends DatabaseConfig
   def checkIfExists(email: String): Boolean = {
     val users = tryAwait(getUsers, 10.seconds)
     var userExists: Boolean = false
-
-    if(users.isDefined) {
+    if (users.isDefined) {
       users.get.foreach(user => if (user.email.equalsIgnoreCase(email)) userExists = true)
     }
     userExists
@@ -95,44 +93,45 @@ class DatabaseUtils extends DatabaseConfig
    * @param email whos verificationComplete param needs to be updated
    * @return Updates isVerificationComplete param of User case class
    */
-  def verifyEmail(email: String): Option[result.UpdateResult] = {
-    val updateUserAsVerified = collection.updateOne(equal("email", email), set("verificationComplete", true)).toFuture()
-    tryAwait(updateUserAsVerified, 60.seconds)
+  def verifyEmail(email: String): Future[result.UpdateResult] = {
+    collection.updateOne(equal("email", email), set("verificationComplete", true)).toFuture()
   }
 
   /**
    *
    * @param chat instance to be saved into database
    */
-  def saveChat(chat: Chat): Option[Completed] = {
-    val future = collectionForChat.insertOne(chat).toFuture()
-    tryAwait(future, 10.seconds)
+  def saveChat(chat: Chat): Future[Completed] = {
+    collectionForChat.insertOne(chat).toFuture()
   }
 
   /**
    *
    * @param chat instance to be saved into database
    */
-  def saveGroupChat(chat: Chat): Option[Completed] = {
+  def saveGroupChat(chat: Chat, executor: ExecutionContext = Routes.executor, system: ActorSystem = Routes.system): Future[Completed] = {
 
-    val group = getGroup(chat.receiver)
-    if (group.isDefined) {
-        for (user <- group.get.participants) {
-          if (!chat.sender.equalsIgnoreCase(user)) {
-            logger.info(s"Notification email scheduled for: ${user}")
-            if(system != null) {
-              system.scheduler.scheduleOnce(500.milliseconds) {
-                system.actorOf(Props[UserActor]).tell(Chat(chat.sender, user, chat.message + s"\nreceived on group ${group.get.groupName}"), ActorRef.noSender)
-              }
+    val group = tryAwait(getGroup(chat.receiver), 60.seconds)
+    implicit val executorContext: ExecutionContext = executor
+
+    if (group.isDefined && group.get.nonEmpty) {
+      for (user <- group.get.head.participants) {
+        if (!chat.sender.equalsIgnoreCase(user)) {
+          logger.info(s"Notification email scheduled for: ${user}")
+          if (system != null) {
+            system.scheduler.scheduleOnce(500.milliseconds) {
+              system.actorOf(Props[UserActor]).tell(
+                Chat(chat.sender, user, chat.message + s"\nreceived on group ${group.get.head.groupName}"), ActorRef.noSender
+              )
             }
           }
         }
+      }
 
-      val future = collectionForGroupChat.insertOne(chat).toFuture()
-      tryAwait(future, 10.seconds)
+      collectionForGroupChat.insertOne(chat).toFuture()
     }
-    else{
-      None
+    else {
+      Future.failed[Completed](new Exception("Group undefined."))
     }
   }
 
@@ -168,18 +167,16 @@ class DatabaseUtils extends DatabaseConfig
    *
    * @param group instance to be saved into database
    */
-  def saveGroup(group: Group): Option[Completed] = {
-    val groupFuture = collectionForGroup.insertOne(group).toFuture()
-    tryAwait(groupFuture, 60.seconds)
+  def saveGroup(group: Group): Future[Completed] = {
+    collectionForGroup.insertOne(group).toFuture()
   }
 
   /**
    *
    * @param group instance to be updated in the database
    */
-  def updateGroup(group: Group): Option[result.UpdateResult] = {
-    val fut = collectionForGroup.updateOne(equal("groupId", group.groupId), set("participants", group.participants)).toFuture()
-    tryAwait(fut, 60.seconds)
+  def updateGroup(group: Group): Future[result.UpdateResult] = {
+    collectionForGroup.updateOne(equal("groupId", group.groupId), set("participants", group.participants)).toFuture()
   }
 
   /**
@@ -187,31 +184,35 @@ class DatabaseUtils extends DatabaseConfig
    * @param groupId of group being referred
    * @param users   Seq of users to be added as participant
    */
-  def addParticipants(groupId: String, users: Seq[String]): Unit = {
+  def addParticipants(groupId: String, users: Seq[String], executor: ExecutionContext = Routes.executor): Unit = {
 
+    implicit val executorContext: ExecutionContext = executor
     val groupOp = getGroup(groupId)
+    groupOp.onComplete {
+      case Success(seqGroup) =>
 
-    if (groupOp.isDefined && users != null) {
-      val group = groupOp.get
-      var newGroup = Group(group.groupId, group.groupName, group.admin, group.participants)
-      var participantsArray = newGroup.participants
-      for (user <- users) {
-        if (doesAccountExist(user) && !group.participants.contains(user)) {
-          logger.info(s"$user added to the group: ${group.groupName}")
-          participantsArray = participantsArray :+ user
+        if (seqGroup.nonEmpty) {
+          val group = seqGroup.head
+          var newGroup = Group(group.groupId, group.groupName, group.admin, group.participants)
+          var participantsArray = newGroup.participants
+          for (user <- users) {
+            if (doesAccountExist(user) && !group.participants.contains(user)) {
+              logger.info(s"$user added to the group: ${group.groupName}")
+              participantsArray = participantsArray :+ user
+            }
+            else {
+              logger.debug(s"$user not added to the group: ${group.groupName}")
+            }
+          }
+          newGroup = Group(group.groupId, group.groupName, group.admin, participantsArray)
+          if (newGroup.participants != null && newGroup.participants.nonEmpty) {
+            updateGroup(newGroup)
+          } else {
+            logger.debug(s"Group:${newGroup.groupName} not updated.")
+          }
         }
-        else {
-          logger.debug(s"$user not added to the group: ${group.groupName}")
-        }
-      }
-
-      newGroup = Group(group.groupId, group.groupName, group.admin, participantsArray)
-
-      if (newGroup.participants != null && newGroup.participants.nonEmpty) {
-        updateGroup(newGroup)
-      } else {
-        logger.debug(s"Group:${newGroup.groupName} not updated.")
-      }
+      case Failure(exception) =>
+        logger.error(exception.getMessage)
     }
   }
 
@@ -220,15 +221,8 @@ class DatabaseUtils extends DatabaseConfig
    * @param groupId associated with required group instance
    * @return group instance
    */
-  def getGroup(groupId: String): Option[Group] = {
-    val groupFuture = collectionForGroup.find(equal("groupId", groupId)).toFuture()
-    val group = tryAwait(groupFuture, 60.seconds)
-
-    if (group.isDefined && group.get.nonEmpty) {
-      Option(group.get.head)
-    } else {
-      None
-    }
+  def getGroup(groupId: String): Future[Seq[Group]] = {
+    collectionForGroup.find(equal("groupId", groupId)).toFuture()
   }
 
   /**
@@ -236,9 +230,8 @@ class DatabaseUtils extends DatabaseConfig
    * @param email receiver email who's messages need to be fetched
    * @return sequence of chats received by provided user
    */
-  def getMessages(email: String): Seq[Chat] = {
-    val chatFuture = collectionForChat.find(equal("receiver", email)).toFuture()
-    tryAwait(chatFuture, 60.seconds).get
+  def getMessages(email: String): Future[Seq[Chat]] = {
+    collectionForChat.find(equal("receiver", email)).toFuture()
   }
 
   /**
@@ -246,9 +239,8 @@ class DatabaseUtils extends DatabaseConfig
    * @param email sender email who's sent messages need to be fetched
    * @return sequence of chats received by provided user
    */
-  def getSentMessages(email: String): Seq[Chat] = {
-    val chatFuture = collectionForChat.find(equal("sender", email)).toFuture()
-    tryAwait(chatFuture, 60.seconds).get
+  def getSentMessages(email: String): Future[Seq[Chat]] = {
+    collectionForChat.find(equal("sender", email)).toFuture()
   }
 
   /**
@@ -256,9 +248,7 @@ class DatabaseUtils extends DatabaseConfig
    * @param groupId of required group
    * @return sequence of chats received by the group
    */
-  def getGroupMessages(groupId: String): Seq[Chat] = {
-    val groupChatFuture = collectionForGroupChat.find(equal("receiver", groupId)).toFuture()
-    tryAwait(groupChatFuture, 60.seconds).get
+  def getGroupMessages(groupId: String): Future[Seq[Chat]] = {
+    collectionForGroupChat.find(equal("receiver", groupId)).toFuture()
   }
-
 }

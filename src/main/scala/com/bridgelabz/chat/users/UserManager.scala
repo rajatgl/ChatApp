@@ -9,6 +9,9 @@ import com.bridgelabz.chat.utils.Utilities.tryAwait
 import com.typesafe.scalalogging.Logger
 import courier.{Envelope, Mailer, Text}
 import javax.mail.internet.InternetAddress
+import org.mongodb.scala.Completed
+
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
@@ -29,7 +32,6 @@ class UserManager {
    */
   def userLogin(user: User): Int = {
     val users = tryAwait(databaseObj.getUsers(user.email), 60.seconds)
-
     var returnStatus: Int = StatusCodes.NOT_FOUND.intValue()
     if(users.isDefined) {
       users.get.foreach(mainUser =>
@@ -53,7 +55,7 @@ class UserManager {
    * @param user the object that is needed to be inserted into the database
    * @return status of the above insertion operation (2xx return preferable)
    */
-  def createNewUser(user: User): Int = {
+  def createNewUser(user: User): (Int, Future[Completed]) = {
     databaseObj.saveUser(user)
   }
 
