@@ -40,12 +40,14 @@ object Routes extends App
     case nex: NullPointerException =>
       extractUri { _ =>
         logger.error(nex.getStackTrace.mkString("Array(", ", ", ")"))
-        complete(OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "Null value found while parsing the data. Contact the admin."))
+        complete(StatusCodes.INTERNAL_SERVER_ERROR.intValue() ->
+          OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "Null value found while parsing the data. Contact the admin."))
       }
     case ex: Exception =>
       extractUri { _ =>
         logger.error(ex.getStackTrace.mkString("Array(", ", ", ")"))
-        complete(OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "Some error occured. Please try again later."))
+        complete(StatusCodes.INTERNAL_SERVER_ERROR.intValue() ->
+          OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "Some error occured. Please try again later."))
       }
   }
 

@@ -5,7 +5,7 @@ import akka.http.javadsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directives, Route}
 import akka.http.scaladsl.server.Directives.{complete, entity, headerValueByName, onComplete, path, post}
 import authentikat.jwt.JsonWebToken
-import com.bridgelabz.chat.Routes.{executor, system}
+import com.bridgelabz.chat.Routes.{databaseUtils, executor, system}
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.jwt.TokenManager.{getClaims, isTokenExpired, secretKey}
 import com.bridgelabz.chat.models.{Chat, Communicate, CommunicateJsonSupport, OutputMessage, OutputMessageJsonFormat, SeqChat, SeqChatJsonSupport, UserActor}

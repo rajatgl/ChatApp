@@ -42,7 +42,7 @@ object TokenManager {
     val claimSet = JwtClaimsSet(
       Map(
         "user" -> (user.email + "!" + user.password),
-        "expiredAt" -> (System.currentTimeMillis() + (24*60*60*1000))
+        "expiredAt" -> (System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(tokenExpiryPeriodInDays))
       )
     )
     JsonWebToken(header, claimSet, secretKey)
