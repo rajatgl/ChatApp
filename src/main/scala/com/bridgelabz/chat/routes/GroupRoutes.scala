@@ -83,7 +83,7 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
               case _ =>
                 val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
                 val groupId: String = (senderEmail + users.groupName).toUpperCase
-                databaseUtils.addParticipants(groupId, users.participantEmails)
+                val promise = databaseUtils.addParticipants(groupId, users.participantEmails)
                 logger.info("New Participant Added.")
                 val finalGroup = databaseUtils.getGroup(groupId)
                 onComplete(finalGroup) {
@@ -104,42 +104,42 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
    * @return route for handling chatting on a group
    */
   def chatGroupRoute: Route = post {
-    Directives.pathPrefix("group") {
-      Directives.path("chat") {
-        entity(Directives.as[Communicate]) { message =>
-          headerValueByName("Authorization") { tokenFromUser =>
+    Directives.path("group/chat") {
+      entity(Directives.as[Communicate]) { message =>
+        headerValueByName("Authorization") { tokenFromUser =>
 
-            val jwtToken = tokenFromUser.split(" ")
-            jwtToken(1) match {
-              case token if isTokenExpired(token) =>
-                complete(StatusCodes.UNAUTHORIZED.intValue() ->
-                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
+          val jwtToken = tokenFromUser.split(" ")
+          jwtToken(1) match {
+            case token if isTokenExpired(token) =>
+              complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
 
-              case token if !JsonWebToken.validate(token, secretKey) =>
-                complete(StatusCodes.UNAUTHORIZED.intValue() ->
-                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
+            case token if !JsonWebToken.validate(token, secretKey) =>
+              complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
 
-              case _ =>
-                val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
-                val groupId: String = message.receiver.toUpperCase
-                val finalGroup = databaseUtils.getGroup(groupId)
+            case _ =>
+              val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
+              val groupId: String = message.receiver.toUpperCase
+              val finalGroup = databaseUtils.getGroup(groupId)
 
-                onComplete(finalGroup) {
-                  case Success(value) =>
-                    if(value.nonEmpty) {
-                      databaseUtils.saveGroupChat(Chat(senderEmail, value.head.groupId, message.message))
+              onComplete(finalGroup) {
+                case Success(value) =>
+                  val saveChatFuture = databaseUtils.saveGroupChat(Chat(senderEmail, value.head.groupId, message.message))
+                  onComplete(saveChatFuture) {
+                    case Success(_) =>
                       logger.info("Chat Saved!")
                       complete(StatusCodes.OK.intValue() -> OutputMessage(StatusCodes.OK.intValue(), "Message has been successfully sent."))
-                    }
-                    else{
+                    case Failure(exception) =>
+                      logger.error(exception.getMessage)
                       complete(StatusCodes.NOT_FOUND.intValue() -> OutputMessage(StatusCodes.NOT_FOUND.intValue(),
                         "The group you mentioned either does not exist, or you are not a part of it."))
-                    }
-                  case Failure(value) => logger.error(s"Invalid groupID: ${value.getMessage}")
-                    complete(StatusCodes.NOT_FOUND.intValue() -> OutputMessage(StatusCodes.NOT_FOUND.intValue(),
-                      "The group you mentioned either does not exist, or you are not a part of it."))
-                }
-            }
+                  }
+                case Failure(value)
+                => logger.error(s"Invalid groupID: ${value.getMessage}")
+                  complete(StatusCodes.NOT_FOUND.intValue() -> OutputMessage(StatusCodes.NOT_FOUND.intValue(),
+                    "The group you mentioned either does not exist, or you are not a part of it."))
+              }
           }
         }
       }
@@ -171,7 +171,7 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
               onComplete(group) {
                 case Success(value) =>
                   if (value.nonEmpty && value.head.participants.contains(senderEmail)) {
-                    onComplete(databaseUtils.getGroupMessages(groupId)){
+                    onComplete(databaseUtils.getGroupMessages(groupId)) {
                       case Success(value) =>
                         complete(SeqChat(value))
                       case Failure(exception) =>

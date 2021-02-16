@@ -45,18 +45,22 @@ class ChatRoutes(databaseUtils: DatabaseUtils) extends CommunicateJsonSupport wi
 
             case _ =>
               val senderEmail = getClaims(jwtToken(1))("user").split("!")(0)
-              if (databaseUtils.doesAccountExist(message.receiver)) {
-                logger.info("Message Transmitted.")
-                system.scheduler.scheduleOnce(500.milliseconds) {
-                  system.actorOf(Props[UserActor]).tell(Chat(senderEmail, message.receiver, message.message), ActorRef.noSender)
+              onComplete(databaseUtils.doesAccountExist(message.receiver)){
+                case Success(value) => if (value) {
+                  logger.info("Message Transmitted.")
+                  system.scheduler.scheduleOnce(500.milliseconds) {
+                    system.actorOf(Props[UserActor]).tell(Chat(senderEmail, message.receiver, message.message), ActorRef.noSender)
+                  }
+                  complete(StatusCodes.OK.intValue() ->
+                    OutputMessage(StatusCodes.OK.intValue(), "The Message has been transmitted."))
                 }
-                complete(StatusCodes.OK.intValue() ->
-                  OutputMessage(StatusCodes.OK.intValue(), "The Message has been transmitted."))
-              }
-              else {
-                logger.error("Receiver Email isn't Registered. ")
-                complete(StatusCodes.NOT_FOUND.intValue() ->
-                  OutputMessage(StatusCodes.NOT_FOUND.intValue(), "The receiver does not seem to be registered with us."))
+                else {
+                  logger.error("Receiver Email isn't Registered. ")
+                  complete(StatusCodes.NOT_FOUND.intValue() ->
+                    OutputMessage(StatusCodes.NOT_FOUND.intValue(), "The receiver does not seem to be registered with us."))
+                }
+                case Failure(exception) => logger.error(exception.getMessage)
+                  complete(StatusCodes.INTERNAL_SERVER_ERROR.intValue() -> OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(),"Some error occurred"))
               }
           }
         }

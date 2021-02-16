@@ -7,10 +7,10 @@ import org.mongodb.scala.Completed
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait ChatDatabase {
+trait IChatService {
 
   def saveChat(chat: Chat): Future[Completed]
-  def saveGroupChat(chat: Chat, executor: ExecutionContext, system: ActorSystem): Future[Completed]
+  def saveGroupChat(chat: Chat): Future[Future[Completed]]
   def getMessages(receiverId: String): Future[Seq[Chat]]
   def getSentMessages(senderId: String): Future[Seq[Chat]]
   def getGroupMessages(groupId: String): Future[Seq[Chat]]

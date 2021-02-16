@@ -30,7 +30,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
       val user: User = TestVariables.user("test@gmail.com")
 
-      when(mockUserManager.createNewUser(user)).thenReturn((StatusCodes.OK.intValue, Future(Completed.apply())))
+      when(mockUserManager.createNewUser(user)).thenReturn(Future(StatusCodes.OK.intValue, Future(Completed.apply())))
       when(mockUserManager.sendVerificationEmail(user))
         .thenReturn(OutputMessage(StatusCodes.OK.intValue, "Verification link sent!"))
 
@@ -58,7 +58,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
       val user: User = TestVariables.user("test@gmail.com")
 
-      when(mockUserManager.createNewUser(user)).thenReturn((StatusCodes.BadRequest.intValue, Future(Completed.apply())))
+      when(mockUserManager.createNewUser(user)).thenReturn(Future(StatusCodes.BadRequest.intValue, Future(Completed.apply())))
       when(mockUserManager.sendVerificationEmail(user))
         .thenReturn(OutputMessage(StatusCodes.OK.intValue, "Verification link sent!"))
 
@@ -86,7 +86,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
       val user: User = TestVariables.user("test@gmail.com")
 
-      when(mockUserManager.createNewUser(user)).thenReturn((StatusCodes.Conflict.intValue, Future(Completed.apply())))
+      when(mockUserManager.createNewUser(user)).thenReturn(Future(StatusCodes.Conflict.intValue, Future(Completed.apply())))
       when(mockUserManager.sendVerificationEmail(user))
         .thenReturn(OutputMessage(StatusCodes.OK.intValue, "Verification link sent!"))
 
@@ -112,7 +112,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
     "Routes should be able to  login an account if POST request sent to /login" in {
       val user: User = TestVariables.user("test@gmail.com")
-      when(mockUserManager.userLogin(user)).thenReturn(StatusCodes.OK.intValue)
+      when(mockUserManager.userLogin(user)).thenReturn(Future(StatusCodes.OK.intValue))
       val jsonRequest = ByteString(
         s"""
             {
@@ -133,7 +133,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
     "Routes should be able to deny login to an account if POST request sent to /login if it does not exist" in {
       val user: User = TestVariables.user("test@gmail.com")
-      when(mockUserManager.userLogin(user)).thenReturn(StatusCodes.NotFound.intValue)
+      when(mockUserManager.userLogin(user)).thenReturn(Future(StatusCodes.NotFound.intValue))
       val jsonRequest = ByteString(
         s"""
             {
@@ -154,7 +154,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
     "Routes should be able to deny login to an account if POST request sent to /login if it is not verified" in {
       val user: User = TestVariables.user("test@gmail.com")
-      when(mockUserManager.userLogin(user)).thenReturn(StatusCodes.Unauthorized.intValue)
+      when(mockUserManager.userLogin(user)).thenReturn(Future(StatusCodes.Unauthorized.intValue))
       val jsonRequest = ByteString(
         s"""
             {
@@ -175,7 +175,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
     "Routes should be able to access chat feature if POST request sent to /chat" in {
       val user: User = TestVariables.user("test@gmail.com")
-      when(mockDatabaseUtils.doesAccountExist("test@gmail.com")).thenReturn(true)
+      when(mockDatabaseUtils.doesAccountExist("test@gmail.com")).thenReturn(Future(true))
       val jsonRequest = ByteString(
         s"""
             {
@@ -196,7 +196,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
     "Routes should be able to deny access to chat feature if POST request sent to /chat with invalid account" in {
       val user: User = TestVariables.user("test@gmail.com")
-      when(mockDatabaseUtils.doesAccountExist("test@gmail.com")).thenReturn(false)
+      when(mockDatabaseUtils.doesAccountExist("test@gmail.com")).thenReturn(Future(false))
       val jsonRequest = ByteString(
         s"""
             {
@@ -217,7 +217,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
     "Routes should be able to deny access to chat feature if POST request sent to /chat with invalid login token" in {
       val user: User = TestVariables.user("test@gmail.com")
-      when(mockDatabaseUtils.doesAccountExist("test@gmail.com")).thenReturn(true)
+      when(mockDatabaseUtils.doesAccountExist("test@gmail.com")).thenReturn(Future(true))
       val jsonRequest = ByteString(
         s"""
             {
@@ -239,7 +239,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
     "Routes should be able to deny access to chat feature if POST request sent to /chat with expired login token" in {
       val user: User = TestVariables.user("test@gmail.com")
-      when(mockDatabaseUtils.doesAccountExist("test@gmail.com")).thenReturn(true)
+      when(mockDatabaseUtils.doesAccountExist("test@gmail.com")).thenReturn(Future(true))
       val jsonRequest = ByteString(
         s"""
             {
@@ -481,7 +481,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val success: Future[Completed] = Future(Completed.apply())
 
       when(mockDatabaseUtils.getGroup(group.groupId)).thenReturn(Future(Seq(group)))
-      when(mockDatabaseUtils.saveGroupChat(Chat(user.email, group.groupId, "hello world"))).thenReturn(success)
+      when(mockDatabaseUtils.saveGroupChat(Chat(user.email, group.groupId, "hello world"))).thenReturn(Future(success))
 
       val jsonRequest = ByteString(
         s"""
@@ -510,7 +510,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val success: Future[Completed] = Future(Completed.apply())
 
       when(mockDatabaseUtils.getGroup(group.groupId)).thenReturn(Future(Seq(group)))
-      when(mockDatabaseUtils.saveGroupChat(Chat(user.email, group.groupId, "hello world"))).thenReturn(success)
+      when(mockDatabaseUtils.saveGroupChat(Chat(user.email, group.groupId, "hello world"))).thenReturn(Future(success))
 
       val jsonRequest = ByteString(
         s"""
@@ -539,7 +539,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val success: Future[Completed] = Future(Completed.apply())
 
       when(mockDatabaseUtils.getGroup(group.groupId)).thenReturn(Future(Seq(group)))
-      when(mockDatabaseUtils.saveGroupChat(Chat(user.email, group.groupId, "hello world"))).thenReturn(success)
+      when(mockDatabaseUtils.saveGroupChat(Chat(user.email, group.groupId, "hello world"))).thenReturn(Future(success))
 
       val jsonRequest = ByteString(
         s"""
@@ -568,7 +568,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val success: Future[Completed] = Future(Completed.apply())
 
       when(mockDatabaseUtils.getGroup(group.groupId)).thenReturn(Future(Seq(group)))
-      when(mockDatabaseUtils.saveGroupChat(Chat(user.email, group.groupId, "hello world"))).thenReturn(success)
+      when(mockDatabaseUtils.saveGroupChat(Chat(user.email, group.groupId, "hello world"))).thenReturn(Future(success))
 
       val jsonRequest = ByteString(
         s"""

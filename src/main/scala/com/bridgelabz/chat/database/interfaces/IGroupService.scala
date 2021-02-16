@@ -5,7 +5,7 @@ import org.mongodb.scala.{Completed, result}
 
 import scala.concurrent.Future
 
-trait GroupDatabase {
+trait IGroupService {
 
   def saveGroup(group: Group): Future[Completed]
   def updateGroup(group: Group): Future[result.UpdateResult]

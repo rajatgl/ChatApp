@@ -1,5 +1,6 @@
 package com.bridgelabz.chat.utils
 
+import com.typesafe.scalalogging.Logger
 import org.scalatest.time.Span
 
 import scala.concurrent.{Await, Future, TimeoutException}
@@ -10,6 +11,7 @@ import scala.concurrent.{Await, Future, TimeoutException}
  * Author: Rajat G.L.
  */
 object Utilities {
+  val logger: Logger = Logger("Utilities")
   /**
    *
    * @param future Future instance to be awaited
@@ -17,8 +19,10 @@ object Utilities {
    * @tparam T generic object type to be extracted
    * @return result else None in case of exception.
    */
+  @Deprecated
   def tryAwait[T](future: Future[T], time: Span): Option[T] = {
     try {
+      logger.warn("Deprecated method: tryAwait called.")
       Some(Await.result(future, time))
     }
     catch {

@@ -2,19 +2,18 @@ package com.bridgelabz.chat.database
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.javadsl.model.StatusCodes
-import com.bridgelabz.chat.Routes
+import com.bridgelabz.chat.Routes.{executor, system}
 import com.bridgelabz.chat.constants.Constants.emailRegex
-import com.bridgelabz.chat.database.interfaces.{ChatDatabase, GroupDatabase, UserDatabase}
+import com.bridgelabz.chat.database.interfaces.{IChatService, IGroupService, IUserService}
 import com.bridgelabz.chat.models.{Chat, Group, User, UserActor}
 import com.bridgelabz.chat.users.EncryptionManager
-import com.bridgelabz.chat.utils.Utilities.tryAwait
 import com.typesafe.scalalogging.Logger
 import org.mongodb.scala.model.Filters.equal
 import org.mongodb.scala.model.Updates.set
 import org.mongodb.scala.{Completed, result}
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 /**
@@ -22,38 +21,42 @@ import scala.util.{Failure, Success}
  * Class: DatabaseUtils.scala
  * Author: Rajat G.L.
  */
-class DatabaseUtils extends DatabaseConfig
-  with ChatDatabase
-  with UserDatabase
-  with GroupDatabase {
+class DatabaseUtils(executorContext: ExecutionContext = executor, actorSystem: ActorSystem = system) extends DatabaseConfig
+  with IChatService
+  with IUserService
+  with IGroupService {
 
   private val logger = Logger("DatabaseUtils")
+  implicit val executor: ExecutionContext = executorContext
+  implicit val system: ActorSystem = actorSystem
 
   /**
    *
    * @param user to be inserted into the database
    * @return status message of the insertion operation
    */
-  def saveUser(user: User): (Int, Future[Completed]) = {
+  def saveUser(user: User): Future[(Int, Future[Completed])] = {
     if (user.email.matches(emailRegex)) {
-      val ifUserExists: Boolean = checkIfExists(user.email)
-      if (ifUserExists) {
-        //A User with the same E-Mail already exists.
-        logger.debug(s"${user.email} conflicted")
-        (StatusCodes.CONFLICT.intValue(), Future.failed(new Exception(s"Email already exists: ${user.email}")))
-      }
-      else {
-        val passwordEnc = EncryptionManager.encrypt(user)
-        val encryptedUser: User = User(user.email, passwordEnc, user.verificationComplete)
-        val future = collection.insertOne(encryptedUser).toFuture()
-        logger.info(s"${user.email} is inserted into db")
-        //"Registration Successful. Please login at: http://localhost:9000/login"
-        (StatusCodes.OK.intValue(), future)
-      }
+      val ifUserExists: Future[Boolean] = checkIfExists(user.email)
+      ifUserExists.map(ifUserExists => {
+        if (ifUserExists) {
+          //A User with the same E-Mail already exists.
+          logger.debug(s"${user.email} conflicted")
+          (StatusCodes.CONFLICT.intValue(), Future.failed(new Exception(s"Email already exists: ${user.email}")))
+        }
+        else {
+          val passwordEnc = EncryptionManager.encrypt(user)
+          val encryptedUser: User = User(user.email, passwordEnc, user.verificationComplete)
+          val future = collection.insertOne(encryptedUser).toFuture()
+          logger.info(s"${user.email} is inserted into db")
+          //"Registration Successful. Please login at: http://localhost:9000/login"
+          (StatusCodes.OK.intValue(), future)
+        }
+      })
     }
     else {
       //"E-Mail Validation Failed"
-      (StatusCodes.BAD_REQUEST.intValue(), Future.failed(new Exception("Bad pattern in email")))
+      Future((StatusCodes.BAD_REQUEST.intValue(), Future.failed(new Exception("Bad pattern in email"))))
     }
   }
 
@@ -62,13 +65,15 @@ class DatabaseUtils extends DatabaseConfig
    * @param email to be checked for existence within the database
    * @return boolean result of check operation
    */
-  def checkIfExists(email: String): Boolean = {
-    val users = tryAwait(getUsers, 10.seconds)
-    var userExists: Boolean = false
-    if (users.isDefined) {
-      users.get.foreach(user => if (user.email.equalsIgnoreCase(email)) userExists = true)
-    }
-    userExists
+  def checkIfExists(email: String): Future[Boolean] = {
+    val users = getUsers
+    users.map(seq => {
+      var userExists: Boolean = false
+      if (seq.nonEmpty) {
+        seq.foreach(user => if (user.email.equalsIgnoreCase(email)) userExists = true)
+      }
+      userExists
+    })
   }
 
   /**
@@ -109,30 +114,31 @@ class DatabaseUtils extends DatabaseConfig
    *
    * @param chat instance to be saved into database
    */
-  def saveGroupChat(chat: Chat, executor: ExecutionContext = Routes.executor, system: ActorSystem = Routes.system): Future[Completed] = {
+  def saveGroupChat(chat: Chat): Future[Future[Completed]] = {
 
-    val group = tryAwait(getGroup(chat.receiver), 60.seconds)
-    implicit val executorContext: ExecutionContext = executor
+    val group = getGroup(chat.receiver)
+    implicit val executor: ExecutionContext = executorContext
 
-    if (group.isDefined && group.get.nonEmpty) {
-      for (user <- group.get.head.participants) {
-        if (!chat.sender.equalsIgnoreCase(user)) {
-          logger.info(s"Notification email scheduled for: ${user}")
-          if (system != null) {
-            system.scheduler.scheduleOnce(500.milliseconds) {
-              system.actorOf(Props[UserActor]).tell(
-                Chat(chat.sender, user, chat.message + s"\nreceived on group ${group.get.head.groupName}"), ActorRef.noSender
-              )
+    group.map(groupSeq => {
+      if(groupSeq.nonEmpty){
+        for (user <- groupSeq.head.participants) {
+          if (!chat.sender.equalsIgnoreCase(user)) {
+            logger.info(s"Notification email scheduled for: $user")
+            if (system != null) {
+              system.scheduler.scheduleOnce(500.milliseconds) {
+                system.actorOf(Props[UserActor]).tell(
+                  Chat(chat.sender, user, chat.message + s"\nreceived on group ${groupSeq.head.groupName}"), ActorRef.noSender
+                )
+              }
             }
           }
         }
+        collectionForGroupChat.insertOne(chat).toFuture()
       }
-
-      collectionForGroupChat.insertOne(chat).toFuture()
-    }
-    else {
-      Future.failed[Completed](new Exception("Group undefined."))
-    }
+      else{
+        Future.failed[Completed](new Exception())
+      }
+    })
   }
 
   /**
@@ -140,27 +146,9 @@ class DatabaseUtils extends DatabaseConfig
    * @param email to check if already registered
    * @return boolean result of check operation
    */
-  def doesAccountExist(email: String): Boolean = {
+  def doesAccountExist(email: String): Future[Boolean] = {
     val dbFuture = collection.find(equal("email", email)).toFuture()
-    val users = tryAwait(dbFuture, 10.seconds)
-    users.nonEmpty
-  }
-
-  /**
-   *
-   * @param email    to check if user is successfully logged in
-   * @param password to be verified
-   * @return boolean result of this check operation
-   */
-  def isSuccessfulLogin(email: String, password: String): Boolean = {
-    val dbFuture = collection.find(equal("email", email)).toFuture()
-    val user = tryAwait(dbFuture, 10.seconds)
-
-    if (user.isDefined && user.get.nonEmpty) {
-      EncryptionManager.verify(user.get.head, password)
-    } else {
-      false
-    }
+    dbFuture.map(users => users.nonEmpty)
   }
 
   /**
@@ -184,36 +172,45 @@ class DatabaseUtils extends DatabaseConfig
    * @param groupId of group being referred
    * @param users   Seq of users to be added as participant
    */
-  def addParticipants(groupId: String, users: Seq[String], executor: ExecutionContext = Routes.executor): Unit = {
+  def addParticipants(groupId: String, users: Seq[String]): Promise[Unit] = {
 
-    implicit val executorContext: ExecutionContext = executor
+    implicit val executor: ExecutionContext = executorContext
     val groupOp = getGroup(groupId)
-    groupOp.onComplete {
-      case Success(seqGroup) =>
+    val promise: Promise[Unit] = Promise[Unit]
 
-        if (seqGroup.nonEmpty) {
-          val group = seqGroup.head
-          var newGroup = Group(group.groupId, group.groupName, group.admin, group.participants)
-          var participantsArray = newGroup.participants
-          for (user <- users) {
-            if (doesAccountExist(user) && !group.participants.contains(user)) {
-              logger.info(s"$user added to the group: ${group.groupName}")
-              participantsArray = participantsArray :+ user
-            }
-            else {
-              logger.debug(s"$user not added to the group: ${group.groupName}")
-            }
-          }
-          newGroup = Group(group.groupId, group.groupName, group.admin, participantsArray)
-          if (newGroup.participants != null && newGroup.participants.nonEmpty) {
-            updateGroup(newGroup)
-          } else {
-            logger.debug(s"Group:${newGroup.groupName} not updated.")
+    groupOp andThen {
+      case Success(seqGroup) =>
+        val group = seqGroup.head
+        var newGroup = Group(group.groupId, group.groupName, group.admin, group.participants)
+        var participantsArray = newGroup.participants
+        for (user <- users) {
+          doesAccountExist(user) andThen {
+            case Success(value) =>
+              if (value && !group.participants.contains(user)) {
+                logger.info(s"$user added to the group: ${group.groupName}")
+                participantsArray = participantsArray :+ user
+              }
+              else {
+                logger.debug(s"$user not added to the group: ${group.groupName}")
+              }
+              newGroup = Group(group.groupId, group.groupName, group.admin, participantsArray)
+              if (newGroup.participants != null && newGroup.participants.nonEmpty) {
+                updateGroup(newGroup)
+                promise success()
+              } else {
+                logger.debug(s"Group:${newGroup.groupName} not updated.")
+                promise failure new Throwable(s"Group:${newGroup.groupName} not updated.")
+              }
+            case Failure(exception) => logger.error(exception.getMessage)
+              promise failure new Throwable(exception.getMessage)
           }
         }
       case Failure(exception) =>
         logger.error(exception.getMessage)
+        promise failure new Throwable(exception.getMessage)
     }
+
+    promise
   }
 
   /**

@@ -5,8 +5,8 @@ import org.mongodb.scala.Completed
 
 import scala.concurrent.Future
 
-trait UserDatabase {
+trait IUserService {
 
-  def saveUser(user: User): (Int, Future[Completed])
+  def saveUser(user: User): Future[(Int, Future[Completed])]
   def getUsers: Future[Seq[User]]
 }

@@ -15,20 +15,31 @@ import scala.util.{Failure, Success}
 
 class FunctionsTest extends AnyFlatSpec {
 
-  private val databaseUtils = new DatabaseUtils
-  implicit val executerTest: ExecutionContextExecutor = ActorSystem("Chat-App-Test").dispatcher
+
+  implicit val system: ActorSystem = ActorSystem("Chat-App-Test")
+  implicit val executor: ExecutionContextExecutor = system.dispatcher
+  private val databaseUtils = new DatabaseUtils(executor, system)
 
   //Database Utils Functions
   "Save User" should "return BAD_REQUEST status code if the email has bad pattern" in {
-    databaseUtils.saveUser(TestVariables.user())._1 == StatusCodes.BAD_REQUEST.intValue()
+    databaseUtils.saveUser(TestVariables.user()).onComplete{
+      case Success(value) => if(value._1 != StatusCodes.BAD_REQUEST.intValue()) throw new Exception
+      case Failure(exception) => throw new Exception
+    }
   }
 
   "Save User" should "return CONFLICT status code if the email already exists" in {
-    databaseUtils.saveUser(TestVariables.user("test@gmail.com"))._1 == StatusCodes.CONFLICT.intValue()
+    databaseUtils.saveUser(TestVariables.user()).onComplete{
+      case Success(value) => if(value._1 != StatusCodes.CONFLICT.intValue()) throw new Exception
+      case Failure(exception) => throw new Exception
+    }
   }
 
   "Save User" should "return OK status code if the user was added" in {
-    databaseUtils.saveUser(TestVariables.user("testingREMOVE@gmail.com"))._1 == StatusCodes.OK.intValue()
+    databaseUtils.saveUser(TestVariables.user()).onComplete{
+      case Success(value) => if(value._1 != StatusCodes.OK.intValue()) throw new Exception
+      case Failure(exception) => throw new Exception
+    }
   }
 
   "Check If Exists" should "return true if the email already exists" in {
@@ -61,12 +72,12 @@ class FunctionsTest extends AnyFlatSpec {
   }
 
   "Does Account Exists" should "return false if account does not exist" in {
-    !databaseUtils.doesAccountExist("test@gmail.com")
+    databaseUtils.doesAccountExist("test@gmail.com").onComplete{
+      case Success(value) => if(value) throw new Exception
+      case Failure(exception) => throw new Exception
+    }
   }
 
-  "Is Successful Login" should "return false for wrong username-password combination" in {
-    !databaseUtils.isSuccessfulLogin(TestVariables.user().email, TestVariables.user().password)
-  }
 
   "Get Group" should "return exception for bad group ID" in {
     databaseUtils.getGroup(TestVariables.groupId()).onComplete {
@@ -105,10 +116,7 @@ class FunctionsTest extends AnyFlatSpec {
 
   "Save Group Chat" should "return complete when group exists" in {
 
-    val actorSystem = ActorSystem("ChatAppTest")
-    val executionContext = actorSystem.dispatcher
-
-    databaseUtils.saveGroupChat(TestVariables.chat(receiver = "randomREMOVE"), executionContext, actorSystem).onComplete {
+    databaseUtils.saveGroupChat(TestVariables.chat(receiver = "randomREMOVE")).onComplete {
       case Success(value) => true
       case Failure(exception) => throw exception
     }
@@ -116,18 +124,14 @@ class FunctionsTest extends AnyFlatSpec {
 
   "Save Group Chat" should "return failed future when group is not created" in {
 
-    val actorSystem = ActorSystem("ChatAppTest")
-    val executionContext = actorSystem.dispatcher
-
-    databaseUtils.saveGroupChat(TestVariables.chat(receiver = "random"), executionContext, actorSystem).onComplete {
+    databaseUtils.saveGroupChat(TestVariables.chat(receiver = "random")).onComplete {
       case Success(value) => throw new Exception("Test case expects future to fail")
       case Failure(exception) => true
     }
   }
 
   "Add Participants" should "execute without exceptions" in {
-    val executionContext = ActorSystem("ChatAppTest").dispatcher
-    databaseUtils.addParticipants("randomREMOVE", Seq("randomUser"), executionContext)
+    databaseUtils.addParticipants("randomREMOVE", Seq("randomUser"))
   }
 
   "Get Sent Messages" should "return a sequence of chats" in {
@@ -137,21 +141,11 @@ class FunctionsTest extends AnyFlatSpec {
     }
   }
 
-  //User Manager Tests
-  "User Login" should "return NOT_FOUND status code if the account does not exist" in {
-    (new UserManager).userLogin(TestVariables.user("testingREMOVE3@gmail.com")) == StatusCodes.NOT_FOUND.intValue()
-  }
-
-  "User Login" should "return UNAUTHORIZED status code if the email is not verified" in {
-    (new UserManager).userLogin(TestVariables.user("testingREMOVE2@gmail.com")) == StatusCodes.UNAUTHORIZED.intValue()
-  }
-
-  "User Login" should "return OK status code if the user can login in successfully" in {
-    (new UserManager).userLogin(TestVariables.user("testingREMOVE@gmail.com")) == StatusCodes.OK.intValue()
-  }
-
   "Create New User" should "return OK status code if the user was added successfully" in {
-    (new UserManager).createNewUser(TestVariables.user("testingREMOVE3@gmail.com"))._1 == StatusCodes.OK.intValue()
+    (new UserManager(executor, system)).createNewUser(TestVariables.user("testingREMOVE3@gmail.com")).onComplete{
+      case Success(value) => if(value._1 != StatusCodes.OK.intValue()) throw new Exception
+      case Failure(exception) => throw exception
+    }
   }
 
   "Send Verification Email" should "return a output message if email was sent" in {

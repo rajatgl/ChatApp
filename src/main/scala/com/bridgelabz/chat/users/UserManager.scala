@@ -1,18 +1,18 @@
 package com.bridgelabz.chat.users
 
+import akka.actor.ActorSystem
 import akka.http.javadsl.model.StatusCodes
+import com.bridgelabz.chat.Routes
 import com.bridgelabz.chat.Routes.executor
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.models.{OutputMessage, User}
-import com.bridgelabz.chat.utils.Utilities.tryAwait
 import com.typesafe.scalalogging.Logger
 import courier.{Envelope, Mailer, Text}
 import javax.mail.internet.InternetAddress
 import org.mongodb.scala.Completed
 
-import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /**
@@ -20,34 +20,28 @@ import scala.util.{Failure, Success}
  * Class: UserManager.scala
  * Author: Rajat G.L.
  */
-class UserManager {
+class UserManager(executionContext: ExecutionContext = Routes.executor, actorSystem: ActorSystem = Routes.system) {
 
   private val logger = Logger("UserManager")
   private val smtpCode = 587
-  private val databaseObj = new DatabaseUtils
   /**
    *
    * @param user instance to be logged in
    * @return status message of login operation
    */
-  def userLogin(user: User): Int = {
-    val users = tryAwait(databaseObj.getUsers(user.email), 60.seconds)
-    var returnStatus: Int = StatusCodes.NOT_FOUND.intValue()
-    if(users.isDefined) {
-      users.get.foreach(mainUser =>
-        if (EncryptionManager.verify(mainUser, user.password)) {
-          if (!mainUser.verificationComplete) {
-            returnStatus = StatusCodes.UNAUTHORIZED.intValue() //user is not verified
-          } else {
-            returnStatus = StatusCodes.OK.intValue() // user is verified and login successful
+  def userLogin(user: User): Future[Int] = {
+    new DatabaseUtils(executionContext, actorSystem).getUsers(user.email).map(users => { var returnStatus: Int = StatusCodes.NOT_FOUND.intValue()
+        users.foreach(mainUser =>
+          if (EncryptionManager.verify(mainUser, user.password)) {
+            if (!mainUser.verificationComplete) {
+              returnStatus = StatusCodes.UNAUTHORIZED.intValue() //user is not verified
+            } else {
+              returnStatus = StatusCodes.OK.intValue() // user is verified and login successful
+            }
           }
-        }
-      )
-      returnStatus
-    }
-    else {
-      returnStatus
-    }
+        )
+        returnStatus
+     })
   }
 
   /**
@@ -55,8 +49,8 @@ class UserManager {
    * @param user the object that is needed to be inserted into the database
    * @return status of the above insertion operation (2xx return preferable)
    */
-  def createNewUser(user: User): (Int, Future[Completed]) = {
-    databaseObj.saveUser(user)
+  def createNewUser(user: User): Future[(Int, Future[Completed])] = {
+    new DatabaseUtils(executionContext, actorSystem).saveUser(user)
   }
 
   /**
