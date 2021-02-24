@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Directives.{complete, entity, onComplete, path,
 import akka.http.scaladsl.server.{Directives, Route}
 import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.models.{LoginRequest, LoginRequestJsonSupport, OutputMessage, OutputMessageJsonFormat, User}
-import com.bridgelabz.chat.users.{EncryptionManager, UserManager}
+import com.bridgelabz.chat.users.{EmailManager, EncryptionManager, UserManager}
 import com.typesafe.scalalogging.Logger
 import org.mongodb.scala.Completed
 
@@ -87,7 +87,7 @@ class UserRoutes(userManager: UserManager) extends LoginRequestJsonSupport with 
               registerLogger.info(s"Email verification started for ${request.email}.")
 
               onComplete(userRegisterStatus._2){
-                case Success(_) => complete(userManager.sendVerificationEmail(user))
+                case Success(_) => complete(EmailManager.sendVerificationEmail(user))
                 case Failure(_) => complete(StatusCodes.INTERNAL_SERVER_ERROR.intValue() ->
                   OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "We encountered on error while registering you.")
                 )

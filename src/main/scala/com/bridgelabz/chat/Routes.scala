@@ -1,6 +1,5 @@
 package com.bridgelabz.chat
 
-import akka.actor.ActorSystem
 import akka.http.javadsl.model.StatusCodes
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.{complete, concat, extractUri, handleExceptions}
@@ -11,7 +10,6 @@ import com.bridgelabz.chat.routes.{ChatRoutes, GroupRoutes, TokenRoutes, UserRou
 import com.bridgelabz.chat.users.UserManager
 import com.typesafe.scalalogging.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 object Routes extends App
@@ -23,17 +21,11 @@ object Routes extends App
   with GroupNameJsonFormat
   with GroupAddUserJsonFormat
   with GroupJsonFormat
-  with SeqChatJsonSupport {
+  with SeqChatJsonSupport
+  with IAkkaRouteService{
 
   // $COVERAGE-OFF$
-  //server configuration variables
-  private val host = System.getenv("Host")
-  private val port = System.getenv("Port").toInt
   private val logger = Logger("Routes")
-
-  //actor system and execution context for AkkaHTTP server
-  implicit val system: ActorSystem = ActorSystem("Chat")
-  implicit val executor: ExecutionContext = system.dispatcher
 
   //catching Null Pointer Exception and other default Exceptions
   val exceptionHandler = ExceptionHandler {
@@ -51,7 +43,7 @@ object Routes extends App
       }
   }
 
-  val databaseUtils = new DatabaseUtils
+  val databaseUtils = new DatabaseUtils(executor, system)
   val userManager = new UserManager
 
   /**
@@ -63,9 +55,9 @@ object Routes extends App
   // $COVERAGE-ON$
   def route(databaseUtils: DatabaseUtils, userManager: UserManager): Route = {
 
+    val userRoutes = new UserRoutes(userManager)
     val chatRoutes = new ChatRoutes(databaseUtils)
     val groupRoutes = new GroupRoutes(databaseUtils)
-    val userRoutes = new UserRoutes(userManager)
     val tokenRoutes = new TokenRoutes(databaseUtils)
 
     handleExceptions(exceptionHandler) {
@@ -99,4 +91,3 @@ object Routes extends App
     case Failure(error) => logger.error(s"Error : ${error.getMessage}")
   }
 }
-

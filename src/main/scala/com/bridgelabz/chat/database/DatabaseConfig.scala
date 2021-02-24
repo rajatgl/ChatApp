@@ -12,43 +12,48 @@ import org.mongodb.scala.{MongoClient, MongoCollection, MongoDatabase}
  * Class: DbConfig.scala
  * Author: Rajat G.L.
  */
-protected trait DatabaseConfig {
+protected class DatabaseConfig(uri: String = s"mongodb://${Constants.mongoHost}:${Constants.mongoPort}") {
 
-  val mongoClient: MongoClient = MongoClient()
-  val databaseName: String = Constants.databaseName
+  private val mongoClient: MongoClient = MongoClient(uri)
 
   //codec providers and registries
-  val codecProvider: CodecProvider = Macros.createCodecProvider[User]()
-  val codecRegistry: CodecRegistry = CodecRegistries.fromRegistries(
+  private val codecProvider: CodecProvider = Macros.createCodecProvider[User]()
+  private val codecRegistry: CodecRegistry = CodecRegistries.fromRegistries(
     CodecRegistries.fromProviders(codecProvider),
     DEFAULT_CODEC_REGISTRY
   )
 
-  val codecProviderForChat: CodecProvider = Macros.createCodecProvider[Chat]()
-  val codecRegistryForChat: CodecRegistry = CodecRegistries.fromRegistries(
+  private val codecProviderForChat: CodecProvider = Macros.createCodecProvider[Chat]()
+  private val codecRegistryForChat: CodecRegistry = CodecRegistries.fromRegistries(
     CodecRegistries.fromProviders(codecProviderForChat),
     DEFAULT_CODEC_REGISTRY
   )
 
-  val codecProviderForGroup: CodecProvider = Macros.createCodecProvider[Group]()
-  val codecRegistryForGroup: CodecRegistry = CodecRegistries.fromRegistries(
+  private val codecProviderForGroup: CodecProvider = Macros.createCodecProvider[Group]()
+  private val codecRegistryForGroup: CodecRegistry = CodecRegistries.fromRegistries(
     CodecRegistries.fromProviders(codecProviderForGroup),
     DEFAULT_CODEC_REGISTRY
   )
 
   //respective collections
-  val database: MongoDatabase = mongoClient.getDatabase(databaseName).withCodecRegistry(codecRegistry)
-  val collectionName: String = Constants.collectionName
-  val collection: MongoCollection[User] = database.getCollection(collectionName)
+  //user collection configs
+  private val database: MongoDatabase = mongoClient.getDatabase(Constants.databaseName).withCodecRegistry(codecRegistry)
+  private val collectionName: String = Constants.collectionName
 
-  val databaseForChat: MongoDatabase = mongoClient.getDatabase(databaseName).withCodecRegistry(codecRegistryForChat)
-  val collectionNameForChat: String = Constants.collectionNameForChat
-  val collectionForChat: MongoCollection[Chat] =databaseForChat.getCollection(collectionNameForChat)
+  //chat collection configs
+  private val databaseForChat: MongoDatabase = mongoClient.getDatabase(Constants.databaseName).withCodecRegistry(codecRegistryForChat)
+  private val collectionNameForChat: String = Constants.collectionNameForChat
 
-  val collectionNameForGroupChat: String = Constants.collectionNameForGroupChat
-  val collectionForGroupChat: MongoCollection[Chat] =databaseForChat.getCollection(collectionNameForGroupChat)
+  //group chat collection configs
+  private val collectionNameForGroupChat: String = Constants.collectionNameForGroupChat
 
-  val databaseForGroup: MongoDatabase = mongoClient.getDatabase(databaseName).withCodecRegistry(codecRegistryForGroup)
-  val collectionNameForGroup: String = Constants.collectionNameForGroup
-  val collectionForGroup: MongoCollection[Group] = databaseForGroup.getCollection(collectionNameForGroup)
+  //group collection configs
+  private val databaseForGroup: MongoDatabase = mongoClient.getDatabase(Constants.databaseName).withCodecRegistry(codecRegistryForGroup)
+  private val collectionNameForGroup: String = Constants.collectionNameForGroup
+
+  //Accessible to anyone who extends DatabaseConfig
+  protected val collection: MongoCollection[User] = database.getCollection(collectionName)
+  protected val collectionForGroup: MongoCollection[Group] = databaseForGroup.getCollection(collectionNameForGroup)
+  protected val collectionForGroupChat: MongoCollection[Chat] = databaseForChat.getCollection(collectionNameForGroupChat)
+  protected val collectionForChat: MongoCollection[Chat] = databaseForChat.getCollection(collectionNameForChat)
 }

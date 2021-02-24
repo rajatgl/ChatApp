@@ -21,6 +21,7 @@ libraryDependencies ++= Seq(
   //mongodb dependency
   "org.mongodb.scala" %% "mongo-scala-driver" % "2.9.0",
   "com.lightbend.akka" %% "akka-stream-alpakka-mongodb" % "2.0.2",
+  "io.netty" % "netty-all" % "4.1.59.Final",
 
   //spray-json for marshalling and unmarshalling the data
   "com.typesafe.akka" %% "akka-http-spray-json" % "10.2.2",

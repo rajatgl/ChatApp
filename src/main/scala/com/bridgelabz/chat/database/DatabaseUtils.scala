@@ -2,9 +2,9 @@ package com.bridgelabz.chat.database
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.javadsl.model.StatusCodes
-import com.bridgelabz.chat.Routes.{executor, system}
+import com.bridgelabz.chat.constants.Constants
 import com.bridgelabz.chat.constants.Constants.emailRegex
-import com.bridgelabz.chat.database.interfaces.{IChatService, IGroupService, IUserService}
+import com.bridgelabz.chat.database.interfaces.{IChatService, IGroupChatService, IGroupService, IUserService}
 import com.bridgelabz.chat.models.{Chat, Group, User, UserActor}
 import com.bridgelabz.chat.users.EncryptionManager
 import com.typesafe.scalalogging.Logger
@@ -13,7 +13,7 @@ import org.mongodb.scala.model.Updates.set
 import org.mongodb.scala.{Completed, result}
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /**
@@ -21,10 +21,12 @@ import scala.util.{Failure, Success}
  * Class: DatabaseUtils.scala
  * Author: Rajat G.L.
  */
-class DatabaseUtils(executorContext: ExecutionContext = executor, actorSystem: ActorSystem = system) extends DatabaseConfig
+class DatabaseUtils(executorContext: ExecutionContext, actorSystem: ActorSystem, uri: String = s"mongodb://${Constants.mongoHost}:${Constants.mongoPort}")
+  extends DatabaseConfig(uri)
   with IChatService
   with IUserService
-  with IGroupService {
+  with IGroupService
+  with IGroupChatService {
 
   private val logger = Logger("DatabaseUtils")
   implicit val executor: ExecutionContext = executorContext
@@ -41,14 +43,13 @@ class DatabaseUtils(executorContext: ExecutionContext = executor, actorSystem: A
       ifUserExists.map(ifUserExists => {
         if (ifUserExists) {
           //A User with the same E-Mail already exists.
-          logger.debug(s"${user.email} conflicted")
           (StatusCodes.CONFLICT.intValue(), Future.failed(new Exception(s"Email already exists: ${user.email}")))
         }
         else {
           val passwordEnc = EncryptionManager.encrypt(user)
           val encryptedUser: User = User(user.email, passwordEnc, user.verificationComplete)
           val future = collection.insertOne(encryptedUser).toFuture()
-          logger.info(s"${user.email} is inserted into db")
+          logger.info(s"New user is inserted into db")
           //"Registration Successful. Please login at: http://localhost:9000/login"
           (StatusCodes.OK.intValue(), future)
         }
@@ -56,6 +57,7 @@ class DatabaseUtils(executorContext: ExecutionContext = executor, actorSystem: A
     }
     else {
       //"E-Mail Validation Failed"
+      logger.error("Bad pattern in email")
       Future((StatusCodes.BAD_REQUEST.intValue(), Future.failed(new Exception("Bad pattern in email"))))
     }
   }
@@ -172,11 +174,10 @@ class DatabaseUtils(executorContext: ExecutionContext = executor, actorSystem: A
    * @param groupId of group being referred
    * @param users   Seq of users to be added as participant
    */
-  def addParticipants(groupId: String, users: Seq[String]): Promise[Unit] = {
+  def addParticipants(groupId: String, users: Seq[String]): Unit = {
 
     implicit val executor: ExecutionContext = executorContext
     val groupOp = getGroup(groupId)
-    val promise: Promise[Unit] = Promise[Unit]
 
     groupOp andThen {
       case Success(seqGroup) =>
@@ -196,21 +197,15 @@ class DatabaseUtils(executorContext: ExecutionContext = executor, actorSystem: A
               newGroup = Group(group.groupId, group.groupName, group.admin, participantsArray)
               if (newGroup.participants != null && newGroup.participants.nonEmpty) {
                 updateGroup(newGroup)
-                promise success()
               } else {
                 logger.debug(s"Group:${newGroup.groupName} not updated.")
-                promise failure new Throwable(s"Group:${newGroup.groupName} not updated.")
               }
             case Failure(exception) => logger.error(exception.getMessage)
-              promise failure new Throwable(exception.getMessage)
           }
         }
       case Failure(exception) =>
         logger.error(exception.getMessage)
-        promise failure new Throwable(exception.getMessage)
     }
-
-    promise
   }
 
   /**

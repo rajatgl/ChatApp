@@ -14,4 +14,6 @@ object Constants {
   val secretKey = "a$iq!@oop"
   val tokenExpiryPeriodInDays = 1
   val emailRegex = "^[a-zA-Z0-9+-._]+@[a-zA-Z0-9.-]+$"
+  val mongoHost = "localhost"
+  val mongoPort = "27017"
 }
