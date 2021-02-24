@@ -28,7 +28,7 @@ class TokenRoutes(databaseUtils: DatabaseUtils) extends OutputMessageJsonFormat 
     path("verify") {
       parameters('token.as[String], 'email.as[String]) { (token, email) =>
         val jwsObject = JWSObject.parse(token)
-        if (jwsObject.getPayload.toJSONObject.get("email").equals(email)) {
+        if (jwsObject.getPayload.toJSONObject.get("identifier").equals(email)) {
           logger.info("User Verified & Registered. ")
           val updateUserAsVerified = databaseUtils.verifyEmail(email)
 

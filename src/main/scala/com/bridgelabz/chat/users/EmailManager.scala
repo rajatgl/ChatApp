@@ -1,13 +1,13 @@
 package com.bridgelabz.chat.users
 
 import akka.http.javadsl.model.StatusCodes
+import com.bridgelabz.chat.Routes.executor
 import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.models.{OutputMessage, User}
 import com.typesafe.scalalogging.Logger
 import courier.{Envelope, Mailer, Text}
 import javax.mail.internet.InternetAddress
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
 /**
@@ -15,10 +15,11 @@ import scala.util.{Failure, Success}
  * Class: EmailManager.scala
  * Author: Rajat G.L.
  */
-object EmailManager {
+class EmailManager {
 
   private val logger = Logger("EmailManager")
   private val smtpCode = 587
+
   /**
    *
    * @param user contains the email to which a verification link is to be sent
@@ -61,9 +62,9 @@ object EmailManager {
     mailer(Envelope.from(new InternetAddress(System.getenv("SENDER_EMAIL")))
       .to(new InternetAddress(email))
       .subject("You have received a message")
-      .content(Text(s"${body}\nHappy to serve you!")))
+      .content(Text(s"$body\nHappy to serve you!")))
       .onComplete {
-        case Success(_) => logger.info(s"Notification email sent to ${email}")
+        case Success(_) => logger.info(s"Notification email sent to $email")
         case Failure(exception) => logger.error(s"Email could not be sent: ${exception.getMessage}")
       }
   }

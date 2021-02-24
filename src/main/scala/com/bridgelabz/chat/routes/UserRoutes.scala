@@ -22,6 +22,7 @@ class UserRoutes(userManager: UserManager) extends LoginRequestJsonSupport with 
 
   val loginLogger: Logger = Logger("loginRoute")
   val registerLogger: Logger = Logger("registerRoute")
+  val emailManager: EmailManager = new EmailManager
 
   /**
    *
@@ -41,7 +42,7 @@ class UserRoutes(userManager: UserManager) extends LoginRequestJsonSupport with 
           case Success(userLoginStatus) =>
             if (userLoginStatus == StatusCodes.OK.intValue()) {
               loginLogger.info("User Login Successful.")
-              respondWithHeaders(RawHeader("Token", TokenManager.generateLoginId(encryptedUser))) {
+              respondWithHeaders(RawHeader("Token", TokenManager.generateToken(encryptedUser))) {
                 complete(userLoginStatus -> OutputMessage(userLoginStatus, "Logged in successfully. Happy to serve you!"))
               }
             }
@@ -87,7 +88,7 @@ class UserRoutes(userManager: UserManager) extends LoginRequestJsonSupport with 
               registerLogger.info(s"Email verification started for ${request.email}.")
 
               onComplete(userRegisterStatus._2){
-                case Success(_) => complete(EmailManager.sendVerificationEmail(user))
+                case Success(_) => complete(emailManager.sendVerificationEmail(user))
                 case Failure(_) => complete(StatusCodes.INTERNAL_SERVER_ERROR.intValue() ->
                   OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "We encountered on error while registering you.")
                 )

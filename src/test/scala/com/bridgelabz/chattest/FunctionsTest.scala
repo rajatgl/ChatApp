@@ -4,7 +4,8 @@ import akka.actor.ActorSystem
 import akka.http.javadsl.model.StatusCodes
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.jwt.TokenManager
-import com.bridgelabz.chat.models.{Chat, OutputMessage, User}
+import com.bridgelabz.chat.models.{OutputMessage, User}
+import com.bridgelabz.chat.users.EmailManager.{sendEmail, sendVerificationEmail}
 import com.bridgelabz.chat.users.{EncryptionManager, UserManager}
 import com.bridgelabz.chat.utils.Utilities.tryAwait
 import org.scalatest.flatspec.AnyFlatSpec
@@ -24,21 +25,21 @@ class FunctionsTest extends AnyFlatSpec {
   "Save User" should "return BAD_REQUEST status code if the email has bad pattern" in {
     databaseUtils.saveUser(TestVariables.user()).onComplete{
       case Success(value) => if(value._1 != StatusCodes.BAD_REQUEST.intValue()) throw new Exception
-      case Failure(exception) => throw new Exception
+      case Failure(_) => throw new Exception
     }
   }
 
   "Save User" should "return CONFLICT status code if the email already exists" in {
     databaseUtils.saveUser(TestVariables.user()).onComplete{
       case Success(value) => if(value._1 != StatusCodes.CONFLICT.intValue()) throw new Exception
-      case Failure(exception) => throw new Exception
+      case Failure(_) => throw new Exception
     }
   }
 
   "Save User" should "return OK status code if the user was added" in {
     databaseUtils.saveUser(TestVariables.user()).onComplete{
       case Success(value) => if(value._1 != StatusCodes.OK.intValue()) throw new Exception
-      case Failure(exception) => throw new Exception
+      case Failure(_) => throw new Exception
     }
   }
 
@@ -66,15 +67,15 @@ class FunctionsTest extends AnyFlatSpec {
   it should "return an update result of the operation" in {
     val updateResult = databaseUtils.verifyEmail("testingREMOVE@gmail.com")
     updateResult.onComplete {
-      case Success(value) => true
-      case Failure(exception) => false
+      case Success(_) => true
+      case Failure(_) => false
     }
   }
 
   "Does Account Exists" should "return false if account does not exist" in {
     databaseUtils.doesAccountExist("test@gmail.com").onComplete{
       case Success(value) => if(value) throw new Exception
-      case Failure(exception) => throw new Exception
+      case Failure(_) => throw new Exception
     }
   }
 
@@ -82,7 +83,7 @@ class FunctionsTest extends AnyFlatSpec {
   "Get Group" should "return exception for bad group ID" in {
     databaseUtils.getGroup(TestVariables.groupId()).onComplete {
       case Success(_) => throw new Exception("Test case expects future to fail")
-      case Failure(exception) => true
+      case Failure(_) => true
     }
   }
 
@@ -109,7 +110,7 @@ class FunctionsTest extends AnyFlatSpec {
 
   "Save Group" should "return optional complete" in {
     databaseUtils.saveGroup(TestVariables.group()).onComplete {
-      case Success(value) => true
+      case Success(_) => true
       case Failure(exception) => throw exception
     }
   }
@@ -117,7 +118,7 @@ class FunctionsTest extends AnyFlatSpec {
   "Save Group Chat" should "return complete when group exists" in {
 
     databaseUtils.saveGroupChat(TestVariables.chat(receiver = "randomREMOVE")).onComplete {
-      case Success(value) => true
+      case Success(_) => true
       case Failure(exception) => throw exception
     }
   }
@@ -125,8 +126,8 @@ class FunctionsTest extends AnyFlatSpec {
   "Save Group Chat" should "return failed future when group is not created" in {
 
     databaseUtils.saveGroupChat(TestVariables.chat(receiver = "random")).onComplete {
-      case Success(value) => throw new Exception("Test case expects future to fail")
-      case Failure(exception) => true
+      case Success(_) => throw new Exception("Test case expects future to fail")
+      case Failure(_) => true
     }
   }
 
@@ -136,13 +137,13 @@ class FunctionsTest extends AnyFlatSpec {
 
   "Get Sent Messages" should "return a sequence of chats" in {
     databaseUtils.getSentMessages("test@gmail.com").onComplete {
-      case Success(value) => true
+      case Success(_) => true
       case Failure(exception) => throw exception
     }
   }
 
   "Create New User" should "return OK status code if the user was added successfully" in {
-    (new UserManager(executor, system)).createNewUser(TestVariables.user("testingREMOVE3@gmail.com")).onComplete{
+    new UserManager(executor, system).createNewUser(TestVariables.user("testingREMOVE3@gmail.com")).onComplete{
       case Success(value) => if(value._1 != StatusCodes.OK.intValue()) throw new Exception
       case Failure(exception) => throw exception
     }
@@ -150,7 +151,7 @@ class FunctionsTest extends AnyFlatSpec {
 
   "Send Verification Email" should "return a output message if email was sent" in {
     try {
-      (new UserManager).sendVerificationEmail(TestVariables.user("test@gmail.com")).isInstanceOf[OutputMessage]
+      sendVerificationEmail(TestVariables.user("test@gmail.com")).isInstanceOf[OutputMessage]
     }
     catch {
       case _: NullPointerException => true
@@ -160,7 +161,7 @@ class FunctionsTest extends AnyFlatSpec {
 
   "Send Email" should "return a output message if email was sent" in {
     try {
-      (new UserManager).sendEmail("test@gmail.com", "Hello")
+      sendEmail("test@gmail.com", "Hello")
       true
     }
     catch {
@@ -174,11 +175,11 @@ class FunctionsTest extends AnyFlatSpec {
   }
 
   "Generate Login ID" should "return a string for any email" in {
-    !TokenManager.generateLoginId(TestVariables.user("test@gmail.com")).isEmpty
+    !TokenManager.generateToken(TestVariables.user("test@gmail.com")).isEmpty
   }
 
   "Is Token Expired" should "return false for valid token" in {
-    val token = TokenManager.generateLoginId(TestVariables.user())
+    val token = TokenManager.generateToken(TestVariables.user())
     TokenManager.isTokenExpired(token)
   }
 

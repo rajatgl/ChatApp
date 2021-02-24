@@ -2,6 +2,7 @@ package com.bridgelabz.chat.database
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.javadsl.model.StatusCodes
+import com.bridgelabz.chat.Routes
 import com.bridgelabz.chat.constants.Constants
 import com.bridgelabz.chat.constants.Constants.emailRegex
 import com.bridgelabz.chat.database.interfaces.{IChatService, IGroupChatService, IGroupService, IUserService}
@@ -21,7 +22,9 @@ import scala.util.{Failure, Success}
  * Class: DatabaseUtils.scala
  * Author: Rajat G.L.
  */
-class DatabaseUtils(executorContext: ExecutionContext, actorSystem: ActorSystem, uri: String = s"mongodb://${Constants.mongoHost}:${Constants.mongoPort}")
+class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
+                    actorSystem: ActorSystem = Routes.system,
+                    uri: String = s"mongodb://${Constants.mongoHost}:${Constants.mongoPort}")
   extends DatabaseConfig(uri)
   with IChatService
   with IUserService

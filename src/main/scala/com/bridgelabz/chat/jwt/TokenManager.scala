@@ -1,9 +1,9 @@
 package com.bridgelabz.chat.jwt
 
 import java.util.concurrent.TimeUnit
+
 import authentikat.jwt.{JsonWebToken, JwtClaimsSet, JwtHeader}
 import com.bridgelabz.chat.constants.Constants
-import com.bridgelabz.chat.constants.Constants.tokenExpiryPeriodInDays
 import com.bridgelabz.chat.models.User
 
 /**
@@ -12,70 +12,44 @@ import com.bridgelabz.chat.models.User
  * Author: Rajat G.L.
  */
 object TokenManager {
-
-  val secretKey: String = Constants.secretKey
-  val header: JwtHeader = JwtHeader("HS256", "JWT")
-
   /**
    *
-   * @param email of user instance to generate a unique token
+   * @param identifier string to be tokenized
+   * @param tokenExpiryPeriodInDays token duration in days
+   * @param header jwtHeader( encryption method)
+   * @param secretKey for encryption
    * @return token
    */
-  def generateToken(email: String): String = {
+  def generateToken(identifier: String,
+                    tokenExpiryPeriodInDays: Int = Constants.tokenExpiryPeriodInDays,
+                    header: JwtHeader = JwtHeader("HS256", "JWT"),
+                    secretKey: String = Constants.secretKey): String = {
 
     val claimSet = JwtClaimsSet(
       Map(
-        "email" -> email,
-        "expiredAt" -> (System.currentTimeMillis() + TimeUnit.DAYS.toMillis(tokenExpiryPeriodInDays))
-      )
-    )
-    JsonWebToken(header, claimSet, secretKey)
-  }
-
-
-  /**
-   *
-   * @param user instance to generate a unique token for
-   * @return token
-   */
-  def generateLoginId(user: User): String = {
-    val claimSet = JwtClaimsSet(
-      Map(
-        "user" -> (user.email + "!" + user.password),
-        "expiredAt" -> (System.currentTimeMillis() + TimeUnit.DAYS.toMillis(tokenExpiryPeriodInDays))
-      )
-    )
-    JsonWebToken(header, claimSet, secretKey)
-  }
-
-  /**
-   *
-   * @param user instance to generate a unique token for
-   * @return invalid token
-   */
-  def generateInvalidLoginId(user: User): String = {
-    val claimSet = JwtClaimsSet(
-      Map(
-        "user" -> (user.email + "!" + user.password),
-        "expiredAt" -> (System.currentTimeMillis() + TimeUnit.DAYS.toMillis(tokenExpiryPeriodInDays))
-      )
-    )
-    JsonWebToken(header, claimSet, "invalidkey")
-  }
-
-  /**
-   *
-   * @param user instance to generate a unique token for
-   * @return expired token
-   */
-  def generateExpiredLoginId(user: User): String = {
-    val claimSet = JwtClaimsSet(
-      Map(
-        "user" -> (user.email + "!" + user.password),
+        "identifier" -> identifier,
         "expiredAt" -> (System.currentTimeMillis() - TimeUnit.DAYS.toMillis(tokenExpiryPeriodInDays))
       )
     )
     JsonWebToken(header, claimSet, secretKey)
+  }
+
+  /**
+   * overloaded generateToken method to accept user object
+   *
+   * @param user object to be passed
+   * @param tokenExpiryPeriodInDays token duration in days
+   * @param header jwtHeader( encryption method)
+   * @param secretKey for encryption
+   * @return token
+   */
+  def generateToken(user: User,
+                    tokenExpiryPeriodInDays: Int = Constants.tokenExpiryPeriodInDays,
+                    header: JwtHeader = JwtHeader("HS256", "JWT"),
+                    secretKey: String = Constants.secretKey): String = {
+
+    val identifier = s"${user.email}!${user.password}"
+    generateToken(identifier, tokenExpiryPeriodInDays, header, secretKey)
   }
 
   /**

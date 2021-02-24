@@ -1,5 +1,6 @@
 package com.bridgelabz.chat
 
+import akka.actor.ActorSystem
 import akka.http.javadsl.model.StatusCodes
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.{complete, concat, extractUri, handleExceptions}
@@ -10,6 +11,7 @@ import com.bridgelabz.chat.routes.{ChatRoutes, GroupRoutes, TokenRoutes, UserRou
 import com.bridgelabz.chat.users.UserManager
 import com.typesafe.scalalogging.Logger
 
+import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 object Routes extends App
@@ -21,10 +23,17 @@ object Routes extends App
   with GroupNameJsonFormat
   with GroupAddUserJsonFormat
   with GroupJsonFormat
-  with SeqChatJsonSupport
-  with IAkkaRouteService{
+  with SeqChatJsonSupport{
 
   // $COVERAGE-OFF$
+  //server configuration variables
+  protected val host: String = System.getenv("Host")
+  protected val port: Int = System.getenv("Port").toInt
+
+  //actor system and execution context for AkkaHTTP server
+  implicit val system: ActorSystem = ActorSystem("Chat")
+  implicit val executor: ExecutionContext = system.dispatcher
+
   private val logger = Logger("Routes")
 
   //catching Null Pointer Exception and other default Exceptions
