@@ -14,6 +14,7 @@ final case class User(email: String, password: String, verificationComplete: Boo
 class UserActor(databaseUtils: DatabaseUtils = new DatabaseUtils) extends Actor {
 
   var logger: Logger = Logger("UserActor")
+  val emailManager: EmailManager = new EmailManager
 
   override def receive: Receive = {
     case Chat(sender, receiver, message) =>
@@ -21,9 +22,8 @@ class UserActor(databaseUtils: DatabaseUtils = new DatabaseUtils) extends Actor 
       val futureChat = databaseUtils.saveChat(Chat(sender, receiver, message))
 
       futureChat.onComplete{
-        case Success(_) => val emailManager: EmailManager = new EmailManager
-          emailManager.sendEmail(receiver, s"Your message reads: $message\n\nThis was sent by $sender")
-
+        case Success(_) => emailManager.sendEmail(receiver,"You have received a new message.",
+            s"Your message reads: $message\n\nThis was sent by $sender")
         case Failure(exception) => logger.error(exception.getMessage)
       }
   }

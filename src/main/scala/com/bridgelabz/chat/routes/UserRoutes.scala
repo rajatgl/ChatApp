@@ -8,8 +8,6 @@ import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.models.{LoginRequest, LoginRequestJsonSupport, OutputMessage, OutputMessageJsonFormat, User}
 import com.bridgelabz.chat.users.{EmailManager, EncryptionManager, UserManager}
 import com.typesafe.scalalogging.Logger
-import org.mongodb.scala.Completed
-
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
@@ -38,11 +36,11 @@ class UserRoutes(userManager: UserManager) extends LoginRequestJsonSupport with 
         val encryptedUser: User = User(request.email, EncryptionManager.encrypt(user), verificationComplete = true)
         val userLoginStatusFuture: Future[Int] = userManager.userLogin(user)
 
-        onComplete(userLoginStatusFuture){
+        onComplete(userLoginStatusFuture) {
           case Success(userLoginStatus) =>
             if (userLoginStatus == StatusCodes.OK.intValue()) {
               loginLogger.info("User Login Successful.")
-              respondWithHeaders(RawHeader("Token", TokenManager.generateToken(encryptedUser))) {
+              respondWithHeaders(RawHeader("Token", TokenManager.generateUserToken(encryptedUser))) {
                 complete(userLoginStatus -> OutputMessage(userLoginStatus, "Logged in successfully. Happy to serve you!"))
               }
             }
@@ -80,15 +78,16 @@ class UserRoutes(userManager: UserManager) extends LoginRequestJsonSupport with 
     path("register") {
       entity(Directives.as[LoginRequest]) { request =>
         val user: User = User(request.email, request.password, verificationComplete = false)
-        val userRegisterStatus: Future[(Int, Future[Completed])] = userManager.createNewUser(user)
+        val userRegisterStatus: Future[(Int, Future[Any])] = userManager.createNewUser(user)
 
-        onComplete(userRegisterStatus){
+        onComplete(userRegisterStatus) {
           case Success(userRegisterStatus) =>
             if (userRegisterStatus._1 == StatusCodes.OK.intValue()) {
               registerLogger.info(s"Email verification started for ${request.email}.")
 
-              onComplete(userRegisterStatus._2){
-                case Success(_) => complete(emailManager.sendVerificationEmail(user))
+              onComplete(userRegisterStatus._2) {
+                case Success(_) => emailManager.sendVerificationEmail(user)
+                  complete(OutputMessage(StatusCodes.OK.intValue(), "Verification link sent!"))
                 case Failure(_) => complete(StatusCodes.INTERNAL_SERVER_ERROR.intValue() ->
                   OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "We encountered on error while registering you.")
                 )

@@ -8,7 +8,6 @@ import com.bridgelabz.chat.Routes
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.models.User
 import com.typesafe.scalalogging.Logger
-import org.mongodb.scala.Completed
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -51,7 +50,7 @@ class UserManager(executionContext: ExecutionContext = Routes.executor, actorSys
    * @param user the object that is needed to be inserted into the database
    * @return status of the above insertion operation (2xx return preferable)
    */
-  def createNewUser(user: User): Future[(Int, Future[Completed])] = {
+  def createNewUser(user: User): Future[(Int, Future[Any])] = {
     databaseUtils.saveUser(user)
   }
 }

@@ -5,6 +5,7 @@ import akka.http.javadsl.model.StatusCodes
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.{complete, concat, extractUri, handleExceptions}
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
+import com.bridgelabz.chat.constants.Constants
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.models._
 import com.bridgelabz.chat.routes.{ChatRoutes, GroupRoutes, TokenRoutes, UserRoutes}
@@ -27,8 +28,8 @@ object Routes extends App
 
   // $COVERAGE-OFF$
   //server configuration variables
-  protected val host: String = System.getenv("Host")
-  protected val port: Int = System.getenv("Port").toInt
+  protected val host: String = Constants.host
+  protected val port: Int = Constants.port
 
   //actor system and execution context for AkkaHTTP server
   implicit val system: ActorSystem = ActorSystem("Chat")

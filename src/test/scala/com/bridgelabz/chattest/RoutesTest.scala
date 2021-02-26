@@ -32,8 +32,6 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val user: User = TestVariables.user("test@gmail.com")
 
       when(mockUserManager.createNewUser(user)).thenReturn(Future(StatusCodes.OK.intValue, Future(Completed.apply())))
-      when(mockEmailManager.sendVerificationEmail(user))
-        .thenReturn(OutputMessage(StatusCodes.OK.intValue, "Verification link sent!"))
 
       val jsonRequest = ByteString(
         s"""
@@ -60,8 +58,6 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val user: User = TestVariables.user("test@gmail.com")
 
       when(mockUserManager.createNewUser(user)).thenReturn(Future(StatusCodes.BadRequest.intValue, Future(Completed.apply())))
-      when(mockEmailManager.sendVerificationEmail(user))
-        .thenReturn(OutputMessage(StatusCodes.OK.intValue, "Verification link sent!"))
 
       val jsonRequest = ByteString(
         s"""
@@ -88,8 +84,6 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val user: User = TestVariables.user("test@gmail.com")
 
       when(mockUserManager.createNewUser(user)).thenReturn(Future(StatusCodes.Conflict.intValue, Future(Completed.apply())))
-      when(mockEmailManager.sendVerificationEmail(user))
-        .thenReturn(OutputMessage(StatusCodes.OK.intValue, "Verification link sent!"))
 
       val jsonRequest = ByteString(
         s"""
@@ -190,7 +184,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         uri = "/chat",
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.OK)
       }
     }
@@ -211,7 +205,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         uri = "/chat",
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.NotFound)
       }
     }
@@ -232,7 +226,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         uri = "/chat",
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,secretKey = "invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,secretKey = "invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -254,7 +248,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         uri = "/chat",
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,tokenExpiryPeriodInDays = -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,tokenExpiryPeriodInDays = -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -264,7 +258,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val user: User = TestVariables.user("test@gmail.com")
       val getRequest = Get("/chat")
 
-      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.OK)
       }
     }
@@ -274,7 +268,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val user: User = TestVariables.user("test@gmail.com")
       val getRequest = Get("/chat")
 
-      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,secretKey="invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,secretKey="invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -284,7 +278,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
       val user: User = TestVariables.user("test@gmail.com")
       val getRequest = Get("/chat")
 
-      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -310,7 +304,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
 
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.OK)
       }
     }
@@ -336,7 +330,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
 
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,secretKey="invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,secretKey="invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -362,7 +356,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
 
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -389,7 +383,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
 
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.OK)
       }
     }
@@ -416,7 +410,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
 
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,secretKey="invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,secretKey="invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -443,7 +437,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
 
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -470,7 +464,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
 
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.NotFound)
       }
     }
@@ -499,7 +493,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
 
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.OK)
       }
     }
@@ -528,7 +522,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
 
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,secretKey="invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,secretKey="invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -557,7 +551,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
 
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -586,7 +580,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
         entity = HttpEntity(MediaTypes.`application/json`, jsonRequest)
       )
 
-      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      postRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.NotFound)
       }
     }
@@ -601,7 +595,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
       val getRequest = Get("/group/chat?groupId=RANDOMRANDOM")
 
-      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.OK)
       }
     }
@@ -616,7 +610,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
       val getRequest = Get("/group/chat?groupId=RANDOMRANDOM")
 
-      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,secretKey="invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,secretKey="invalidKey"))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -631,7 +625,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
       val getRequest = Get("/group/chat?groupId=RANDOMRANDOM")
 
-      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -646,7 +640,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
 
       val getRequest = Get("/group/chat?groupId=RANDOMRANDOM")
 
-      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
+      getRequest ~> addCredentials(OAuth2BearerToken(TokenManager.generateUserToken(user,tokenExpiryPeriodInDays= -1))) ~> Routes.route(mockDatabaseUtils, mockUserManager) ~> check {
         status.equals(StatusCodes.Unauthorized)
       }
     }
@@ -654,7 +648,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
     "Routes should be able to verify user if GET request is sent to /verify" in {
 
       val user: User = TestVariables.user("test@gmail.com")
-      val success: Future[result.UpdateResult] = Future[result.UpdateResult]{val a: result.UpdateResult = null; a}
+      val success: Future[Boolean] = Future[Boolean](true)
 
       when(mockDatabaseUtils.verifyEmail(user.email)).thenReturn(success)
 
@@ -668,7 +662,7 @@ class RoutesTest extends AnyWordSpec with Matchers with ScalatestRouteTest with 
     "Routes should be able to deny verification of user if GET request is sent to /verify with invalid email" in {
 
       val user: User = TestVariables.user("test@gmail.com")
-      val failure: Future[result.UpdateResult] = Future.failed[result.UpdateResult](new Throwable)
+      val failure: Future[Boolean] = Future.failed[Boolean](new Throwable)
 
       when(mockDatabaseUtils.verifyEmail(user.email)).thenReturn(failure)
 

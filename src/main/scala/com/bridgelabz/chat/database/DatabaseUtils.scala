@@ -3,15 +3,11 @@ package com.bridgelabz.chat.database
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.javadsl.model.StatusCodes
 import com.bridgelabz.chat.Routes
-import com.bridgelabz.chat.constants.Constants
 import com.bridgelabz.chat.constants.Constants.emailRegex
-import com.bridgelabz.chat.database.interfaces.{IChatService, IGroupChatService, IGroupService, IUserService}
+import com.bridgelabz.chat.database.mongodb.{ChatDatabase, GroupChatDatabase, GroupDatabase, UserDatabase}
 import com.bridgelabz.chat.models.{Chat, Group, User, UserActor}
 import com.bridgelabz.chat.users.EncryptionManager
 import com.typesafe.scalalogging.Logger
-import org.mongodb.scala.model.Filters.equal
-import org.mongodb.scala.model.Updates.set
-import org.mongodb.scala.{Completed, result}
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
@@ -24,12 +20,10 @@ import scala.util.{Failure, Success}
  */
 class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
                     actorSystem: ActorSystem = Routes.system,
-                    uri: String = s"mongodb://${Constants.mongoHost}:${Constants.mongoPort}")
-  extends DatabaseConfig(uri)
-  with IChatService
-  with IUserService
-  with IGroupService
-  with IGroupChatService {
+                    userDatabase: UserDatabase = new UserDatabase(),
+                    chatDatabase: ChatDatabase = new ChatDatabase(),
+                    groupDatabase: GroupDatabase = new GroupDatabase(),
+                    groupChatDatabase: GroupChatDatabase = new GroupChatDatabase()) {
 
   private val logger = Logger("DatabaseUtils")
   implicit val executor: ExecutionContext = executorContext
@@ -40,7 +34,7 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
    * @param user to be inserted into the database
    * @return status message of the insertion operation
    */
-  def saveUser(user: User): Future[(Int, Future[Completed])] = {
+  def saveUser(user: User): Future[(Int, Future[Any])] = {
     if (user.email.matches(emailRegex)) {
       val ifUserExists: Future[Boolean] = checkIfExists(user.email)
       ifUserExists.map(ifUserExists => {
@@ -51,7 +45,7 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
         else {
           val passwordEnc = EncryptionManager.encrypt(user)
           val encryptedUser: User = User(user.email, passwordEnc, user.verificationComplete)
-          val future = collection.insertOne(encryptedUser).toFuture()
+          val future = userDatabase.create(encryptedUser)
           logger.info(s"New user is inserted into db")
           //"Registration Successful. Please login at: http://localhost:9000/login"
           (StatusCodes.OK.intValue(), future)
@@ -86,7 +80,7 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
    * @return all user instances in the database
    */
   def getUsers: Future[Seq[User]] = {
-    collection.find().toFuture()
+    userDatabase.read()
   }
 
   /**
@@ -95,7 +89,16 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
    * @return user instances in the database associated with the given email
    */
   def getUsers(email: String): Future[Seq[User]] = {
-    collection.find(equal("email", email)).toFuture()
+
+    userDatabase.read().map(users => {
+      var finalList: Seq[User] = Seq()
+      for(user <- users){
+        if(user.email.equals(email)) {
+          finalList = finalList :+ user
+        }
+      }
+      finalList
+    })
   }
 
   /**
@@ -103,26 +106,37 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
    * @param email whos verificationComplete param needs to be updated
    * @return Updates isVerificationComplete param of User case class
    */
-  def verifyEmail(email: String): Future[result.UpdateResult] = {
-    collection.updateOne(equal("email", email), set("verificationComplete", true)).toFuture()
+  def verifyEmail(email: String): Future[Boolean] = {
+
+    val user = getUsers(email)
+    user.map(users => {
+      if(users.nonEmpty){
+
+        val newUser = User(users.head.email, users.head.password, verificationComplete = true)
+        userDatabase.update(email, newUser)
+        true
+      }
+      else{
+        false
+      }
+    })
   }
 
   /**
    *
    * @param chat instance to be saved into database
    */
-  def saveChat(chat: Chat): Future[Completed] = {
-    collectionForChat.insertOne(chat).toFuture()
+  def saveChat(chat: Chat): Future[Any] = {
+    chatDatabase.create(chat)
   }
 
   /**
    *
    * @param chat instance to be saved into database
    */
-  def saveGroupChat(chat: Chat): Future[Future[Completed]] = {
+  def saveGroupChat(chat: Chat): Future[Future[Any]] = {
 
     val group = getGroup(chat.receiver)
-    implicit val executor: ExecutionContext = executorContext
 
     group.map(groupSeq => {
       if(groupSeq.nonEmpty){
@@ -138,10 +152,10 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
             }
           }
         }
-        collectionForGroupChat.insertOne(chat).toFuture()
+        groupChatDatabase.create(chat)
       }
       else{
-        Future.failed[Completed](new Exception())
+        Future.failed[Any](new Exception())
       }
     })
   }
@@ -152,7 +166,7 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
    * @return boolean result of check operation
    */
   def doesAccountExist(email: String): Future[Boolean] = {
-    val dbFuture = collection.find(equal("email", email)).toFuture()
+    val dbFuture = getUsers(email)
     dbFuture.map(users => users.nonEmpty)
   }
 
@@ -160,16 +174,8 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
    *
    * @param group instance to be saved into database
    */
-  def saveGroup(group: Group): Future[Completed] = {
-    collectionForGroup.insertOne(group).toFuture()
-  }
-
-  /**
-   *
-   * @param group instance to be updated in the database
-   */
-  def updateGroup(group: Group): Future[result.UpdateResult] = {
-    collectionForGroup.updateOne(equal("groupId", group.groupId), set("participants", group.participants)).toFuture()
+  def saveGroup(group: Group): Future[Any] = {
+    groupDatabase.create(group)
   }
 
   /**
@@ -199,7 +205,7 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
               }
               newGroup = Group(group.groupId, group.groupName, group.admin, participantsArray)
               if (newGroup.participants != null && newGroup.participants.nonEmpty) {
-                updateGroup(newGroup)
+                groupDatabase.update(newGroup.groupId, newGroup)
               } else {
                 logger.debug(s"Group:${newGroup.groupName} not updated.")
               }
@@ -217,7 +223,15 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
    * @return group instance
    */
   def getGroup(groupId: String): Future[Seq[Group]] = {
-    collectionForGroup.find(equal("groupId", groupId)).toFuture()
+    groupDatabase.read().map(groups => {
+      var finalList: Seq[Group] = Seq()
+      for(group <- groups){
+        if(group.groupId.equals(groupId)){
+          finalList = finalList :+ group
+        }
+      }
+      finalList
+    })
   }
 
   /**
@@ -226,7 +240,16 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
    * @return sequence of chats received by provided user
    */
   def getMessages(email: String): Future[Seq[Chat]] = {
-    collectionForChat.find(equal("receiver", email)).toFuture()
+
+    chatDatabase.read().map(chats => {
+      var finalList: Seq[Chat] = Seq()
+      for(chat <- chats){
+        if(chat.receiver.equals(email)){
+          finalList = finalList :+ chat
+        }
+      }
+      finalList
+    })
   }
 
   /**
@@ -235,7 +258,15 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
    * @return sequence of chats received by provided user
    */
   def getSentMessages(email: String): Future[Seq[Chat]] = {
-    collectionForChat.find(equal("sender", email)).toFuture()
+    chatDatabase.read().map(chats => {
+      var finalList: Seq[Chat] = Seq()
+      for(chat <- chats){
+        if(chat.sender.equals(email)){
+          finalList = finalList :+ chat
+        }
+      }
+      finalList
+    })
   }
 
   /**
@@ -244,6 +275,14 @@ class DatabaseUtils(executorContext: ExecutionContext = Routes.executor,
    * @return sequence of chats received by the group
    */
   def getGroupMessages(groupId: String): Future[Seq[Chat]] = {
-    collectionForGroupChat.find(equal("receiver", groupId)).toFuture()
+    groupChatDatabase.read().map(chats => {
+      var finalList: Seq[Chat] = Seq()
+      for(chat <- chats){
+        if(chat.receiver.equals(groupId)){
+          finalList = finalList :+ chat
+        }
+      }
+      finalList
+    })
   }
 }

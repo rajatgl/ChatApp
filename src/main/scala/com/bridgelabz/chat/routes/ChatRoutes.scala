@@ -50,7 +50,7 @@ class ChatRoutes(databaseUtils: DatabaseUtils) extends CommunicateJsonSupport wi
                 case Success(value) => if (value) {
                   logger.info("Message Transmitted.")
                   system.scheduler.scheduleOnce(500.milliseconds) {
-                    system.actorOf(Props[UserActor]).tell(Chat(senderEmail, message.receiver, message.message), ActorRef.noSender)
+                    system.actorOf(Props(new UserActor())).tell(Chat(senderEmail, message.receiver, message.message), ActorRef.noSender)
                   }
                   complete(StatusCodes.OK.intValue() ->
                     OutputMessage(StatusCodes.OK.intValue(), "The Message has been transmitted."))

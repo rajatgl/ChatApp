@@ -22,13 +22,13 @@ object TokenManager {
    */
   def generateToken(identifier: String,
                     tokenExpiryPeriodInDays: Int = Constants.tokenExpiryPeriodInDays,
-                    header: JwtHeader = JwtHeader("HS256", "JWT"),
+                    header: JwtHeader = JwtHeader(Constants.encryptionType),
                     secretKey: String = Constants.secretKey): String = {
 
     val claimSet = JwtClaimsSet(
       Map(
         "identifier" -> identifier,
-        "expiredAt" -> (System.currentTimeMillis() - TimeUnit.DAYS.toMillis(tokenExpiryPeriodInDays))
+        "expiredAt" -> (System.currentTimeMillis() + TimeUnit.DAYS.toMillis(tokenExpiryPeriodInDays))
       )
     )
     JsonWebToken(header, claimSet, secretKey)
@@ -43,7 +43,7 @@ object TokenManager {
    * @param secretKey for encryption
    * @return token
    */
-  def generateToken(user: User,
+  def generateUserToken(user: User,
                     tokenExpiryPeriodInDays: Int = Constants.tokenExpiryPeriodInDays,
                     header: JwtHeader = JwtHeader("HS256", "JWT"),
                     secretKey: String = Constants.secretKey): String = {

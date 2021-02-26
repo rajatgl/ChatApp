@@ -43,7 +43,7 @@ object EncryptionManager {
       mac.toString().equals(user.password)
     }
     catch {
-      case ex: Throwable => false
+      case _: Throwable => false
     }
   }
 }

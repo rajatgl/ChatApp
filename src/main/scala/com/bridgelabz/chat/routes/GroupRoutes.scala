@@ -1,7 +1,7 @@
 package com.bridgelabz.chat.routes
 
 import akka.http.javadsl.model.StatusCodes
-import akka.http.scaladsl.server.Directives.{_symbol2NR, complete, entity, headerValueByName, onComplete, parameters, path, post}
+import akka.http.scaladsl.server.Directives.{_symbol2NR, complete, entity, headerValueByName, onComplete, parameters, path, pathPrefix, post}
 import akka.http.scaladsl.server.{Directives, Route}
 import authentikat.jwt.JsonWebToken
 import com.bridgelabz.chat.constants.Constants
@@ -106,42 +106,44 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
    * @return route for handling chatting on a group
    */
   def chatGroupRoute: Route = post {
-    Directives.path("group/chat") {
-      entity(Directives.as[Communicate]) { message =>
-        headerValueByName("Authorization") { tokenFromUser =>
+    Directives.pathPrefix("group") {
+      Directives.path("chat") {
+        entity(Directives.as[Communicate]) { message =>
+          headerValueByName("Authorization") { tokenFromUser =>
 
-          val jwtToken = tokenFromUser.split(" ")
-          jwtToken(1) match {
-            case token if isTokenExpired(token) =>
-              complete(StatusCodes.UNAUTHORIZED.intValue() ->
-                OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
+            val jwtToken = tokenFromUser.split(" ")
+            jwtToken(1) match {
+              case token if isTokenExpired(token) =>
+                complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
 
-            case token if !JsonWebToken.validate(token, Constants.secretKey) =>
-              complete(StatusCodes.UNAUTHORIZED.intValue() ->
-                OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
+              case token if !JsonWebToken.validate(token, Constants.secretKey) =>
+                complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
 
-            case _ =>
-              val senderEmail = getClaims(jwtToken(1))("identifier").split("!")(0)
-              val groupId: String = message.receiver.toUpperCase
-              val finalGroup = databaseUtils.getGroup(groupId)
+              case _ =>
+                val senderEmail = getClaims(jwtToken(1))("identifier").split("!")(0)
+                val groupId: String = message.receiver.toUpperCase
+                val finalGroup = databaseUtils.getGroup(groupId)
 
-              onComplete(finalGroup) {
-                case Success(value) =>
-                  val saveChatFuture = databaseUtils.saveGroupChat(Chat(senderEmail, value.head.groupId, message.message))
-                  onComplete(saveChatFuture) {
-                    case Success(_) =>
-                      logger.info("Chat Saved!")
-                      complete(StatusCodes.OK.intValue() -> OutputMessage(StatusCodes.OK.intValue(), "Message has been successfully sent."))
-                    case Failure(exception) =>
-                      logger.error(exception.getMessage)
-                      complete(StatusCodes.NOT_FOUND.intValue() -> OutputMessage(StatusCodes.NOT_FOUND.intValue(),
-                        "The group you mentioned either does not exist, or you are not a part of it."))
-                  }
-                case Failure(value)
-                => logger.error(s"Invalid groupID: ${value.getMessage}")
-                  complete(StatusCodes.NOT_FOUND.intValue() -> OutputMessage(StatusCodes.NOT_FOUND.intValue(),
-                    "The group you mentioned either does not exist, or you are not a part of it."))
-              }
+                onComplete(finalGroup) {
+                  case Success(value) =>
+                    val saveChatFuture = databaseUtils.saveGroupChat(Chat(senderEmail, value.head.groupId, message.message))
+                    onComplete(saveChatFuture) {
+                      case Success(_) =>
+                        logger.info("Chat Saved!")
+                        complete(StatusCodes.OK.intValue() -> OutputMessage(StatusCodes.OK.intValue(), "Message has been successfully sent."))
+                      case Failure(exception) =>
+                        logger.error(exception.getMessage)
+                        complete(StatusCodes.NOT_FOUND.intValue() -> OutputMessage(StatusCodes.NOT_FOUND.intValue(),
+                          "The group you mentioned either does not exist, or you are not a part of it."))
+                    }
+                  case Failure(value)
+                  => logger.error(s"Invalid groupID: ${value.getMessage}")
+                    complete(StatusCodes.NOT_FOUND.intValue() -> OutputMessage(StatusCodes.NOT_FOUND.intValue(),
+                      "The group you mentioned either does not exist, or you are not a part of it."))
+                }
+            }
           }
         }
       }
@@ -157,38 +159,40 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
   //scalastyle:off
   def getChatGroupRoute: Route = Directives.get {
     //fetch chats for provided groupID
-    path("group/chat") {
-      parameters('groupId.as[String]) { groupId =>
-        headerValueByName("Authorization") { tokenFromUser =>
-          val jwtToken = tokenFromUser.split(" ")
-          jwtToken(1) match {
-            case token if isTokenExpired(token) =>
-              complete(StatusCodes.UNAUTHORIZED.intValue() -> OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
-            case token if !JsonWebToken.validate(token, Constants.secretKey) =>
-              complete(StatusCodes.UNAUTHORIZED.intValue() ->
-                OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
-            case _ =>
-              val senderEmail = getClaims(jwtToken(1))("identifier").split("!")(0)
-              val group = databaseUtils.getGroup(groupId)
-              onComplete(group) {
-                case Success(value) =>
-                  if (value.nonEmpty && value.head.participants.contains(senderEmail)) {
-                    onComplete(databaseUtils.getGroupMessages(groupId)) {
-                      case Success(value) =>
-                        complete(SeqChat(value))
-                      case Failure(exception) =>
-                        logger.error(exception.getMessage)
-                        complete(OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "Could not load the requested messages"))
+    pathPrefix("group") {
+      path("chat") {
+        parameters('groupId.as[String]) { groupId =>
+          headerValueByName("Authorization") { tokenFromUser =>
+            val jwtToken = tokenFromUser.split(" ")
+            jwtToken(1) match {
+              case token if isTokenExpired(token) =>
+                complete(StatusCodes.UNAUTHORIZED.intValue() -> OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token has expired. Please login again."))
+              case token if !JsonWebToken.validate(token, Constants.secretKey) =>
+                complete(StatusCodes.UNAUTHORIZED.intValue() ->
+                  OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
+              case _ =>
+                val senderEmail = getClaims(jwtToken(1))("identifier").split("!")(0)
+                val group = databaseUtils.getGroup(groupId)
+                onComplete(group) {
+                  case Success(value) =>
+                    if (value.nonEmpty && value.head.participants.contains(senderEmail)) {
+                      onComplete(databaseUtils.getGroupMessages(groupId)) {
+                        case Success(value) =>
+                          complete(SeqChat(value))
+                        case Failure(exception) =>
+                          logger.error(exception.getMessage)
+                          complete(OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "Could not load the requested messages"))
+                      }
+                    } else {
+                      complete(StatusCodes.FORBIDDEN.intValue() ->
+                        OutputMessage(StatusCodes.FORBIDDEN.intValue(), "You are not a member of this group."))
                     }
-                  } else {
-                    complete(StatusCodes.FORBIDDEN.intValue() ->
-                      OutputMessage(StatusCodes.FORBIDDEN.intValue(), "You are not a member of this group."))
-                  }
-                case Failure(exception) =>
-                  logger.error(exception.getMessage)
-                  complete(StatusCodes.NOT_FOUND.intValue() ->
-                    OutputMessage(StatusCodes.NOT_FOUND.intValue(), "Group not found."))
-              }
+                  case Failure(exception) =>
+                    logger.error(exception.getMessage)
+                    complete(StatusCodes.NOT_FOUND.intValue() ->
+                      OutputMessage(StatusCodes.NOT_FOUND.intValue(), "Group not found."))
+                }
+            }
           }
         }
       }

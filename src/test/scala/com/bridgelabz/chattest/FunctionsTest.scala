@@ -5,8 +5,7 @@ import akka.http.javadsl.model.StatusCodes
 import com.bridgelabz.chat.database.DatabaseUtils
 import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.models.{OutputMessage, User}
-import com.bridgelabz.chat.users.EmailManager.{sendEmail, sendVerificationEmail}
-import com.bridgelabz.chat.users.{EncryptionManager, UserManager}
+import com.bridgelabz.chat.users.{EmailManager, EncryptionManager, UserManager}
 import com.bridgelabz.chat.utils.Utilities.tryAwait
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
@@ -20,6 +19,7 @@ class FunctionsTest extends AnyFlatSpec {
   implicit val system: ActorSystem = ActorSystem("Chat-App-Test")
   implicit val executor: ExecutionContextExecutor = system.dispatcher
   private val databaseUtils = new DatabaseUtils(executor, system)
+  private val emailManager = new EmailManager
 
   //Database Utils Functions
   "Save User" should "return BAD_REQUEST status code if the email has bad pattern" in {
@@ -148,10 +148,23 @@ class FunctionsTest extends AnyFlatSpec {
       case Failure(exception) => throw exception
     }
   }
+//
+//  "User Login" should "return NOT_FOUND status code if the account does not exist" in {
+//    (new UserManager).userLogin(TestVariables.user("testingREMOVE3@gmail.com")) == StatusCodes.NOT_FOUND.intValue()
+//  }
+//  "User Login" should "return UNAUTHORIZED status code if the email is not verified" in {
+//    (new UserManager).userLogin(TestVariables.user("testingREMOVE2@gmail.com")) == StatusCodes.UNAUTHORIZED.intValue()
+//  }
+//  "User Login" should "return OK status code if the user can login in successfully" in {
+//    (new UserManager).userLogin(TestVariables.user("testingREMOVE@gmail.com")) == StatusCodes.OK.intValue()
+//  }
+//  "Create New User" should "return OK status code if the user was added successfully" in {
+//    (new UserManager).createNewUser(TestVariables.user("testingREMOVE3@gmail.com")) == StatusCodes.OK.intValue()
+//  }
 
   "Send Verification Email" should "return a output message if email was sent" in {
     try {
-      sendVerificationEmail(TestVariables.user("test@gmail.com")).isInstanceOf[OutputMessage]
+      emailManager.sendVerificationEmail(TestVariables.user("test@gmail.com"))
     }
     catch {
       case _: NullPointerException => true
@@ -161,7 +174,7 @@ class FunctionsTest extends AnyFlatSpec {
 
   "Send Email" should "return a output message if email was sent" in {
     try {
-      sendEmail("test@gmail.com", "Hello")
+      emailManager.sendEmail("test@gmail.com", "Hello", "Hello")
       true
     }
     catch {
@@ -175,11 +188,11 @@ class FunctionsTest extends AnyFlatSpec {
   }
 
   "Generate Login ID" should "return a string for any email" in {
-    !TokenManager.generateToken(TestVariables.user("test@gmail.com")).isEmpty
+    !TokenManager.generateUserToken(TestVariables.user("test@gmail.com")).isEmpty
   }
 
   "Is Token Expired" should "return false for valid token" in {
-    val token = TokenManager.generateToken(TestVariables.user())
+    val token = TokenManager.generateUserToken(TestVariables.user())
     TokenManager.isTokenExpired(token)
   }
 

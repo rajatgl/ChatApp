@@ -1,9 +1,9 @@
 package com.bridgelabz.chat.users
 
-import akka.http.javadsl.model.StatusCodes
 import com.bridgelabz.chat.Routes.executor
+import com.bridgelabz.chat.constants.Constants
 import com.bridgelabz.chat.jwt.TokenManager
-import com.bridgelabz.chat.models.{OutputMessage, User}
+import com.bridgelabz.chat.models.User
 import com.typesafe.scalalogging.Logger
 import courier.{Envelope, Mailer, Text}
 import javax.mail.internet.InternetAddress
@@ -18,35 +18,19 @@ import scala.util.{Failure, Success}
 class EmailManager {
 
   private val logger = Logger("EmailManager")
-  private val smtpCode = 587
 
   /**
    *
    * @param user contains the email to which a verification link is to be sent
    * @return status message as a string to be printed for the user
    */
-  def sendVerificationEmail(user: User): OutputMessage = {
+  def sendVerificationEmail(user: User): Unit = {
     val token: String = TokenManager.generateToken(user.email)
-    val longUrl = "http://localhost:9000/verify?token=" + token + "&email=" + user.email
+    val longUrl = s"http://localhost:9000/verify?token=$token&email=${user.email}"
 
-    val mailer = Mailer("smtp.gmail.com", smtpCode)
-      .auth(true)
-      .as(System.getenv("SENDER_EMAIL"), System.getenv("SENDER_PASSWORD"))
-      .startTls(true)()
-    mailer(Envelope.from(new InternetAddress(System.getenv("SENDER_EMAIL")))
-      .to(new InternetAddress(user.email))
-      .subject("Token")
-      .content(Text(s"Click on this link to verify your email address: $longUrl. Happy to serve you!")))
-      .onComplete {
-        case Success(_) =>
-          logger.info(s"Verification email sent to ${user.email}")
-          OutputMessage(StatusCodes.OK.intValue(), "Verification link sent!")
-        case Failure(exception) =>
-          logger.error(s"Failed to send verification email: ${exception.getMessage}")
-          OutputMessage(StatusCodes.INTERNAL_SERVER_ERROR.intValue(), "Failed to verify user!")
-      }
-
-    OutputMessage(StatusCodes.OK.intValue(), "Verification link sent!") //guaranteed return
+    sendEmail(user.email,
+      "Token for Chat-App",
+      s"Click on this link to verify your email address: $longUrl.")
   }
 
   /**
@@ -54,14 +38,19 @@ class EmailManager {
    * @param email of the recipient
    * @param body  of the email to be sent
    */
-  def sendEmail(email: String, body: String): Unit = {
-    val mailer = Mailer("smtp.gmail.com", smtpCode)
+  def sendEmail(email: String,
+                subject: String,
+                body: String,
+                mailProtocol: String = Constants.mailProtocol,
+                mailStatusCode: Int = Constants.mailStatusCode): Unit = {
+
+    val mailer = Mailer(mailProtocol, mailStatusCode)
       .auth(true)
-      .as(System.getenv("SENDER_EMAIL"), System.getenv("SENDER_PASSWORD"))
+      .as(Constants.senderEmail, Constants.senderPassword)
       .startTls(true)()
-    mailer(Envelope.from(new InternetAddress(System.getenv("SENDER_EMAIL")))
+    mailer(Envelope.from(new InternetAddress(Constants.senderEmail))
       .to(new InternetAddress(email))
-      .subject("You have received a message")
+      .subject(subject)
       .content(Text(s"$body\nHappy to serve you!")))
       .onComplete {
         case Success(_) => logger.info(s"Notification email sent to $email")
