@@ -11,8 +11,8 @@ import org.mongodb.scala.{Completed, MongoCollection}
 
 import scala.concurrent.Future
 
-class UserDatabase(collectionName: String = Constants.collectionName,
-                   databaseName: String = Constants.databaseName)
+class UserCollection(collectionName: String = Constants.collectionName,
+                     databaseName: String = Constants.databaseName)
   extends MongoDbConfig[User] with ISaver[User] with ILoader[User] {
 
   val codecProvider: CodecProvider = Macros.createCodecProvider[User]()
