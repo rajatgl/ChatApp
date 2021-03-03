@@ -4,10 +4,12 @@ import akka.http.javadsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.Directives.{complete, entity, onComplete, path, post, respondWithHeaders}
 import akka.http.scaladsl.server.{Directives, Route}
+import com.bridgelabz.chat.database.managers.UserManager
 import com.bridgelabz.chat.jwt.TokenManager
 import com.bridgelabz.chat.models.{LoginRequest, LoginRequestJsonSupport, OutputMessage, OutputMessageJsonFormat, User}
-import com.bridgelabz.chat.users.{EmailManager, EncryptionManager, UserManager}
+import com.bridgelabz.chat.users.{EmailManager, EncryptionManager}
 import com.typesafe.scalalogging.Logger
+
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
@@ -78,7 +80,7 @@ class UserRoutes(userManager: UserManager) extends LoginRequestJsonSupport with 
     path("register") {
       entity(Directives.as[LoginRequest]) { request =>
         val user: User = User(request.email, request.password, verificationComplete = false)
-        val userRegisterStatus: Future[(Int, Future[Any])] = userManager.createNewUser(user)
+        val userRegisterStatus: Future[(Int, Future[Any])] = userManager.saveUser(user)
 
         onComplete(userRegisterStatus) {
           case Success(userRegisterStatus) =>

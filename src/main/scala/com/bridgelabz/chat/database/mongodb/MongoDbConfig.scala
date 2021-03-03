@@ -9,14 +9,14 @@ import org.mongodb.scala.{MongoClient, MongoCollection, MongoDatabase}
  * Class: DbConfig.scala
  * Author: Rajat G.L.
  */
-protected class MongoDbConfig[T: scala.reflect.ClassTag](uri: String = s"mongodb://${Constants.mongoHost}:${Constants.mongoPort}") {
+protected class MongoDbConfig(uri: String = s"mongodb://${Constants.mongoHost}:${Constants.mongoPort}") {
 
   //Add any other configurations here
   private val mongoClient: MongoClient = MongoClient(uri)
 
-  protected def getCollection(collectionName: String,
-                              codecRegistry: CodecRegistry,
-                              databaseName: String):
+  def getCollection[T: scala.reflect.ClassTag](collectionName: String,
+                    codecRegistry: CodecRegistry,
+                    databaseName: String):
   MongoCollection[T] = {
 
     val database: MongoDatabase = mongoClient.getDatabase(databaseName).withCodecRegistry(codecRegistry)

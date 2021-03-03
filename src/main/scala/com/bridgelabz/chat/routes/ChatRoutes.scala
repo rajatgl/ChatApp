@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.{Directives, Route}
 import authentikat.jwt.JsonWebToken
 import com.bridgelabz.chat.Routes.{executor, system}
 import com.bridgelabz.chat.constants.Constants
-import com.bridgelabz.chat.database.DatabaseUtils
+import com.bridgelabz.chat.database.managers.{ChatManager, UserManager}
 import com.bridgelabz.chat.jwt.TokenManager.{getClaims, isTokenExpired}
 import com.bridgelabz.chat.models._
 import com.typesafe.scalalogging.Logger
@@ -20,9 +20,10 @@ import scala.util.{Failure, Success}
  * Class: ChatRoutes.scala
  * Author: Rajat G.L.
  */
-class ChatRoutes(databaseUtils: DatabaseUtils) extends CommunicateJsonSupport with OutputMessageJsonFormat with SeqChatJsonSupport {
+class ChatRoutes(chatManager: ChatManager, userManager: UserManager) extends CommunicateJsonSupport with OutputMessageJsonFormat with SeqChatJsonSupport {
 
   val logger: Logger = Logger("ChatRoute")
+
   /**
    *
    * @return route for handling one-to-one chatting
@@ -46,7 +47,7 @@ class ChatRoutes(databaseUtils: DatabaseUtils) extends CommunicateJsonSupport wi
 
             case _ =>
               val senderEmail = getClaims(jwtToken(1))("identifier").split("!")(0)
-              onComplete(databaseUtils.doesAccountExist(message.receiver)){
+              onComplete(userManager.doesAccountExist(message.receiver)){
                 case Success(value) => if (value) {
                   logger.info("Message Transmitted.")
                   system.scheduler.scheduleOnce(500.milliseconds) {
@@ -90,7 +91,7 @@ class ChatRoutes(databaseUtils: DatabaseUtils) extends CommunicateJsonSupport wi
 
           case _ =>
             val senderEmail = getClaims(jwtToken(1))("identifier").split("!")(0)
-            onComplete(databaseUtils.getMessages(senderEmail)){
+            onComplete(chatManager.getMessages(senderEmail)){
               case Success(value) =>
                 complete(StatusCodes.OK.intValue() -> SeqChat(value))
               case Failure(exception) =>

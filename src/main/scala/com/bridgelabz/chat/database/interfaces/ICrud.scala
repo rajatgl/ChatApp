@@ -2,13 +2,19 @@ package com.bridgelabz.chat.database.interfaces
 
 import scala.concurrent.Future
 
-trait ISaver[T] {
+trait ICrud[T] {
   /**
    *
    * @param entity object to be created in the database
    * @return any status identifier for the create operation
    */
   def create(entity: T): Future[Any]
+
+  /**
+   *
+   * @return sequence of objects in the database
+   */
+  def read(): Future[Seq[T]]
 
   /**
    *

@@ -45,7 +45,7 @@ object TokenManager {
    */
   def generateUserToken(user: User,
                     tokenExpiryPeriodInDays: Int = Constants.tokenExpiryPeriodInDays,
-                    header: JwtHeader = JwtHeader("HS256", "JWT"),
+                    header: JwtHeader = JwtHeader(Constants.encryptionType),
                     secretKey: String = Constants.secretKey): String = {
 
     val identifier = s"${user.email}!${user.password}"

@@ -6,10 +6,10 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.{complete, concat, extractUri, handleExceptions}
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import com.bridgelabz.chat.constants.Constants
-import com.bridgelabz.chat.database.DatabaseUtils
+import com.bridgelabz.chat.database.managers.{ChatManager, GroupManager, UserManager}
+import com.bridgelabz.chat.database.mongodb.{CodecRepository, DatabaseCollection}
 import com.bridgelabz.chat.models._
 import com.bridgelabz.chat.routes.{ChatRoutes, GroupRoutes, TokenRoutes, UserRoutes}
-import com.bridgelabz.chat.users.UserManager
 import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.ExecutionContext
@@ -37,6 +37,10 @@ object Routes extends App
 
   private val logger = Logger("Routes")
 
+  val userManager: UserManager = new UserManager(new DatabaseCollection[User](Constants.collectionName, CodecRepository.USER))
+  val chatManager: ChatManager = new ChatManager(new DatabaseCollection[Chat](Constants.collectionNameForChat, CodecRepository.CHAT))
+  val groupManager: GroupManager = new GroupManager(new DatabaseCollection[Group](Constants.collectionNameForGroup, CodecRepository.GROUP))
+
   //catching Null Pointer Exception and other default Exceptions
   val exceptionHandler = ExceptionHandler {
     case nex: NullPointerException =>
@@ -53,9 +57,6 @@ object Routes extends App
       }
   }
 
-  val databaseUtils = new DatabaseUtils(executor, system)
-  val userManager = new UserManager
-
   /**
    * handles all the get post requests to appropriate path endings
    *
@@ -63,12 +64,12 @@ object Routes extends App
    */
 
   // $COVERAGE-ON$
-  def route(databaseUtils: DatabaseUtils, userManager: UserManager): Route = {
+  def route(userManager: UserManager, chatManager: ChatManager, groupManager: GroupManager): Route = {
 
     val userRoutes = new UserRoutes(userManager)
-    val chatRoutes = new ChatRoutes(databaseUtils)
-    val groupRoutes = new GroupRoutes(databaseUtils)
-    val tokenRoutes = new TokenRoutes(databaseUtils)
+    val chatRoutes = new ChatRoutes(chatManager,userManager)
+    val groupRoutes = new GroupRoutes(groupManager,chatManager, userManager)
+    val tokenRoutes = new TokenRoutes(userManager)
 
     handleExceptions(exceptionHandler) {
       concat(
@@ -95,7 +96,7 @@ object Routes extends App
 
   // $COVERAGE-OFF$
   //binder for the server
-  val binder = Http().newServerAt(host, port).bind(route(databaseUtils, userManager))
+  val binder = Http().newServerAt(host, port).bind(route(userManager,chatManager,groupManager))
   binder.onComplete {
     case Success(serverBinding) => logger.info(s"Listening to ${serverBinding.localAddress}")
     case Failure(error) => logger.error(s"Error : ${error.getMessage}")

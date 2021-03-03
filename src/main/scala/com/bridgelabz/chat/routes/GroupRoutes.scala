@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Directives.{_symbol2NR, complete, entity, heade
 import akka.http.scaladsl.server.{Directives, Route}
 import authentikat.jwt.JsonWebToken
 import com.bridgelabz.chat.constants.Constants
-import com.bridgelabz.chat.database.DatabaseUtils
+import com.bridgelabz.chat.database.managers.{ChatManager, GroupManager, UserManager}
 import com.bridgelabz.chat.jwt.TokenManager.{getClaims, isTokenExpired}
 import com.bridgelabz.chat.models._
 import com.typesafe.scalalogging.Logger
@@ -17,7 +17,7 @@ import scala.util.{Failure, Success}
  * Class: GroupRoutes.scala
  * Author: Rajat G.L.
  */
-class GroupRoutes(databaseUtils: DatabaseUtils)
+class GroupRoutes(groupManager: GroupManager, chatManager: ChatManager, userManager: UserManager)
   extends GroupNameJsonFormat
     with OutputMessageJsonFormat
     with GroupAddUserJsonFormat
@@ -51,7 +51,7 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
                 val senderEmail = getClaims(jwtToken(1))("identifier").split("!")(0)
                 val uniqueId: String = (senderEmail + groupName.groupName).toUpperCase
                 val group: Group = Group(uniqueId, groupName.groupName, senderEmail, Array[String](senderEmail))
-                databaseUtils.saveGroup(group)
+                groupManager.saveGroup(group)
                 logger.info("Group Created.")
                 complete(StatusCodes.OK.intValue() ->
                   OutputMessage(StatusCodes.OK.intValue(), "The group has been created successfully."))
@@ -62,6 +62,8 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
     }
   }
 
+  // Cyclomatic Complexity of 12 can't be avoided due to Async Directives
+  //scalastyle:off
   /**
    *
    * @return route for handling adding users to a group
@@ -85,15 +87,24 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
               case _ =>
                 val senderEmail = getClaims(jwtToken(1))("identifier").split("!")(0)
                 val groupId: String = (senderEmail + users.groupName).toUpperCase
-                databaseUtils.addParticipants(groupId, users.participantEmails)
-                logger.info("New Participant Added.")
-                val finalGroup = databaseUtils.getGroup(groupId)
-                onComplete(finalGroup) {
-                  case Success(value) => complete(value)
-                  case Failure(_) =>
-                    complete(StatusCodes.NOT_FOUND.intValue() ->
-                      OutputMessage(StatusCodes.NOT_FOUND.intValue(), "Group not found. Please create the group before adding participants."))
+
+                for(userEmail <- users.participantEmails){
+
+                  onComplete(userManager.doesAccountExist(userEmail)){
+                    case Success(value) if !value => complete(
+                      StatusCodes.BAD_REQUEST.intValue() ->
+                      OutputMessage(
+                        StatusCodes.BAD_REQUEST.intValue(),
+                        s"$userEmail is not registered with us."
+                      )
+                    )
+                  }
                 }
+
+                groupManager.addParticipants(groupId, users.participantEmails)
+
+                complete(StatusCodes.OK.intValue() ->
+                  OutputMessage(StatusCodes.OK.intValue(), "Users added to your group."))
             }
           }
         }
@@ -124,11 +135,11 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
               case _ =>
                 val senderEmail = getClaims(jwtToken(1))("identifier").split("!")(0)
                 val groupId: String = message.receiver.toUpperCase
-                val finalGroup = databaseUtils.getGroup(groupId)
+                val finalGroup = groupManager.getGroup(groupId)
 
                 onComplete(finalGroup) {
-                  case Success(value) =>
-                    val saveChatFuture = databaseUtils.saveGroupChat(Chat(senderEmail, value.head.groupId, message.message))
+                  case Success(value) if value.nonEmpty =>
+                    val saveChatFuture = chatManager.saveGroupChat(Chat(senderEmail, value.head.groupId, message.message), value.head)
                     onComplete(saveChatFuture) {
                       case Success(_) =>
                         logger.info("Chat Saved!")
@@ -138,10 +149,13 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
                         complete(StatusCodes.NOT_FOUND.intValue() -> OutputMessage(StatusCodes.NOT_FOUND.intValue(),
                           "The group you mentioned either does not exist, or you are not a part of it."))
                     }
-                  case Failure(value)
-                  => logger.error(s"Invalid groupID: ${value.getMessage}")
+                  case Failure(exception) => logger.error(s"Invalid groupID: ${exception.getMessage}")
                     complete(StatusCodes.NOT_FOUND.intValue() -> OutputMessage(StatusCodes.NOT_FOUND.intValue(),
                       "The group you mentioned either does not exist, or you are not a part of it."))
+
+                  case _ => logger.info("Group not found.")
+                    complete(StatusCodes.NOT_FOUND.intValue() -> OutputMessage(StatusCodes.NOT_FOUND.intValue(),
+                      "The group you mentioned either does not exist."))
                 }
             }
           }
@@ -155,8 +169,6 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
    * @return route for fetching a list of chats on a group
    */
 
-  // Cyclomatic Complexity of 12 can't be avoided
-  //scalastyle:off
   def getChatGroupRoute: Route = Directives.get {
     //fetch chats for provided groupID
     pathPrefix("group") {
@@ -172,11 +184,11 @@ class GroupRoutes(databaseUtils: DatabaseUtils)
                   OutputMessage(StatusCodes.UNAUTHORIZED.intValue(), "Token is invalid. Please login again to generate a new one."))
               case _ =>
                 val senderEmail = getClaims(jwtToken(1))("identifier").split("!")(0)
-                val group = databaseUtils.getGroup(groupId)
+                val group = groupManager.getGroup(groupId)
                 onComplete(group) {
                   case Success(value) =>
                     if (value.nonEmpty && value.head.participants.contains(senderEmail)) {
-                      onComplete(databaseUtils.getGroupMessages(groupId)) {
+                      onComplete(chatManager.getGroupMessages(groupId)) {
                         case Success(value) =>
                           complete(SeqChat(value))
                         case Failure(exception) =>

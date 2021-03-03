@@ -21,20 +21,6 @@ class EmailManager {
 
   /**
    *
-   * @param user contains the email to which a verification link is to be sent
-   * @return status message as a string to be printed for the user
-   */
-  def sendVerificationEmail(user: User): Unit = {
-    val token: String = TokenManager.generateToken(user.email)
-    val longUrl = s"http://localhost:9000/verify?token=$token&email=${user.email}"
-
-    sendEmail(user.email,
-      "Token for Chat-App",
-      s"Click on this link to verify your email address: $longUrl.")
-  }
-
-  /**
-   *
    * @param email of the recipient
    * @param body  of the email to be sent
    */
@@ -56,5 +42,23 @@ class EmailManager {
         case Success(_) => logger.info(s"Notification email sent to $email")
         case Failure(exception) => logger.error(s"Email could not be sent: ${exception.getMessage}")
       }
+  }
+
+  /**
+   *
+   * @param user contains the email to which a verification link is to be sent
+   * @return status message as a string to be printed for the user
+   */
+  def sendVerificationEmail(user: User,
+                            mailProtocol: String = Constants.mailProtocol,
+                            mailStatusCode: Int = Constants.mailStatusCode): Unit = {
+    val token: String = TokenManager.generateToken(user.email)
+    val longUrl = s"http://localhost:9000/verify?token=$token&email=${user.email}"
+
+    sendEmail(user.email,
+      "Token for Chat-App",
+      s"Click on this link to verify your email address: $longUrl.",
+      mailProtocol,
+      mailStatusCode)
   }
 }
